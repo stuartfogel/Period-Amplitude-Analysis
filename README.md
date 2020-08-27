@@ -25,6 +25,11 @@ using the eeglab interface:
 * load an eeglab dataset
 * navigate to Tools>Period Amplitude Analysis>
 
+using the batch script:
+
+* use the included PAA_standalone.m script to run multiple files as a batch. 
+* manually specify user-defined parameters prior to running script
+
 ## Authors
 
 Sleep Well
