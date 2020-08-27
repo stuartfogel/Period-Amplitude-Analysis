@@ -35,6 +35,8 @@ function [EEG] = PAA(EEG,ChOI,badData)
 % 'negDownSlope': negative half-wave downward slope in uV/sec
 %
 % June 24, 2020
+% Aug 27, 2020  Revised 1.1 Critical bug fixes: ch order, polarity, channel
+% labels
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
@@ -105,13 +107,14 @@ ChName = {EEG.chanlocs.labels};
 nChOI = false(size(ChName));
 ChOI = strsplit(ChOI,' ');
 for n = 1:length(ChOI)
+    chIdx(n) = find(strcmp(ChName, ChOI{n}));
     nChOI = logical(nChOI + strcmp(ChName,ChOI{n}));
 end
 if ~any(nChOI)
     error('Missing or incorrect channel label input')
 end
-data = double(EEG.data(nChOI,:)); % filtfilt needs double precision data
-clear ChName iChOI nChOI n
+data = double(EEG.data(chIdx,:)); % filtfilt needs double precision data. Note: this also re-orders channels to match ChOI channel order.
+clear n nChOI chIdx
 
 %% filter the EEG channels of interest
 lp = designfilt('lowpassiir', 'FilterOrder', LPorder, 'StopbandFrequency', LPfreq, 'StopbandAttenuation', LPattenuation, 'SampleRate', EEG.srate);
@@ -122,7 +125,7 @@ for n=1:size(data,1)
     filtCh = filtfilt(hp,filtCh);
     datafilt(n,:) = filtCh(1,:);
 end
-clear hp lp LPorder LPfreq LPattenuation HPorder HPfreq HPattenuation filtCh n data
+clear hp lp filtCh n data
 
 %% process each channel
 for nch=1:size(datafilt,1)
@@ -157,18 +160,36 @@ for nch=1:size(datafilt,1)
                 segDown{n} = datafilt(nch,idx_up(n)+1:idx_down(n+1));
             end
         end
+    else % then they must be the same length
+        for n=1:length(idx_up)-1
+            if idx_up(1) < idx_down(1) % which one is first?
+                segUp{n} = datafilt(nch,idx_up(n)+1:idx_down(n));
+                segDown{n} = datafilt(nch,idx_down(n)+1:idx_up(n+1));
+            elseif idx_up(1) > idx_down(1)
+                segUp{n} = datafilt(nch,idx_down(n)+1:idx_up(n));
+                segDown{n} = datafilt(nch,idx_up(n)+1:idx_down(n+1));
+            end
+        end
     end
     
+    % verify that polarity is correct
+    if sign(segUp{1}(1)) ~= 1 && sign(segDown{1}(1)) ~= -1
+        for nSeg=1:length(segUp)
+            segUp{nSeg}=segUp{nSeg}*-1;
+            segDown{nSeg}=segDown{nSeg}*-1;
+        end
+    end
+
     % identify and count HWs > peak amplitude threshold & longer than high freq cut-off
     % e.g., slow waves: 75 uV peak-to-peak, 37.5 uV for positive or
     % negative half-waves e.g., > 0.25 sec (re; impossible to have a SW <2Hz happen in that time)
-    segUpDetect = false(1,length(segUp{n}));
+    segUpDetect = false(1,length(segUp));
     for n=1:length(segUp)
-        segUpDetect(n) = logical(max(segUp{n})>37.5 && length(segUp{n})>1/targetLPfreq*EEG.srate/2 && min(segDown{n})<-37.5 && length(segDown{n})>1/targetLPfreq*EEG.srate/2);
+        segUpDetect(n) = logical(max(abs(segUp{n}))>37.5 && length(segUp{n})>1/targetLPfreq*EEG.srate/2 && max(abs(segDown{n}))<37.5 && length(segDown{n})>1/targetLPfreq*EEG.srate/2);
     end
-    segDownDetect = false(1,length(segDown{n}));
+    segDownDetect = false(1,length(segDown));
     for n=1:length(segDown)
-        segDownDetect(n) = logical(min(segDown{n})<-37.5 && length(segDown{n})>1/targetLPfreq*EEG.srate/2 && max(segUp{n})>37.5 && length(segUp{n})>1/targetLPfreq*EEG.srate/2);
+        segDownDetect(n) = logical(max(abs(segDown{n}))<37.5 && length(segDown{n})>1/targetLPfreq*EEG.srate/2 && max(abs(segUp{n}))>37.5 && length(segUp{n})>1/targetLPfreq*EEG.srate/2);
     end
     
     % compute HW period, frequency, peak amplitude, peak, integrated (i.e., area under curve: sum of rectified values * 1/srate),
@@ -245,7 +266,7 @@ for nch=1:size(datafilt,1)
                     eventsUp(nevt).latency = latency + segUpHWpeakLat(n);
                     eventsUp(nevt).duration = 1; % one sample peak marker
                 end
-                eventsUp(nevt).channel = ChOI{nch};
+                eventsUp(nevt).channel = find(strcmp(ChName, ChOI{nch}));
                 eventsUp(nevt).urevent = [];
                 nevt = nevt + 1; % valid event counter
             end
@@ -263,7 +284,7 @@ for nch=1:size(datafilt,1)
                     eventsDown(nevt).latency = latency + segDownHWpeakLat(n);
                     eventsDown(nevt).duration = 1; % one sample peak marker
                 end
-                eventsDown(nevt).channel = ChOI{nch};
+                eventsDown(nevt).channel = find(strcmp(ChName, ChOI{nch}));
                 eventsDown(nevt).urevent = [];
                 nevt = nevt + 1; % valid event counter
             end
@@ -287,7 +308,7 @@ for nch=1:size(datafilt,1)
                     eventsUp(nevt).latency = latency + segUpHWpeakLat(n);
                     eventsUp(nevt).duration = 1; % one sample peak marker
                 end
-                eventsUp(nevt).channel = ChOI{nch};
+                eventsUp(nevt).channel = find(strcmp(ChName, ChOI{nch}));
                 eventsUp(nevt).urevent = [];
                 nevt = nevt + 1; % valid event counter
             end
@@ -309,7 +330,7 @@ for nch=1:size(datafilt,1)
                     eventsDown(nevt).latency = latency + segDownHWpeakLat(n);
                     eventsDown(nevt).duration = 1; % one sample peak marker
                 end
-                eventsDown(nevt).channel = ChOI{nch};
+                eventsDown(nevt).channel = find(strcmp(ChName, ChOI{nch}));
                 eventsDown(nevt).urevent = [];
                 nevt = nevt + 1; % valid event counter
             end
@@ -398,12 +419,6 @@ for iEvt = evtIdx % loop on event
         end
     end
 end
-
-% let's flag the bad event
-for iEvt = ToRmv
-    Event(iEvt).type = 'BAD'; % so that they will get flagged for removal from results table and EEG.event below
-end
-EEG.event = Event;
 clear bad Event
 
 % remove NaN values from the results table
