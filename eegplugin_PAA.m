@@ -13,14 +13,16 @@ function vers = eegplugin_PAA(fig, trystrs, catchstrs)
 % See also:
 %   PAA, pop_PAA, eeglab
 %
-% June 24, 2020 Version 1.0
-% Aug 27, 2020  Revised 1.1 Critical bug fixes: ch order, polarity, channel
+% June 24, 2020  Version 1.0
+% Aug  27, 2020  Revised 1.1 Critical bug fixes: ch order, polarity, channel
 % labels
+% Sept 13, 2020  Revised 1.2 included sleep stages in output and SW events,
+% fixed bug for SW inclusion criteria, optimised code
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
 
-vers = '1.1';
+vers = '1.2';
 if nargin < 3
     error('eegplugin_PAA requires 3 arguments');
 end

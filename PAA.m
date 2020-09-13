@@ -1,4 +1,4 @@
-function [EEG] = PAA(EEG,ChOI,badData)
+function [EEG] = PAA(EEG,ChOI,badData,allSleepStages)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -34,9 +34,11 @@ function [EEG] = PAA(EEG,ChOI,badData)
 % 'negUpSlope': negative half-wave upward slope in uV/sec
 % 'negDownSlope': negative half-wave downward slope in uV/sec
 %
-% June 24, 2020
-% Aug 27, 2020  Revised 1.1 Critical bug fixes: ch order, polarity, channel
+% June 24, 2020 Version 1.0
+% Aug  27, 2020 Revised 1.1 Critical bug fixes: ch order, polarity, channel
 % labels
+% Sept 13, 2020 Revised 1.2 included sleep stages in output and SW events,
+% fixed bug for SW inclusion criteria, optimised code
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
@@ -53,6 +55,7 @@ function [EEG] = PAA(EEG,ChOI,badData)
 if nargin < 1; EEG = eeg_emptyset(); end
 if nargin < 2; ChOI = 'F3 Fz F4'; end % default
 if nargin < 3; badData = 'Movement'; end % name for movement artifact. Default: 'Movement'.
+if nargin < 4; allSleepStages = 'N1 N2 N3 REM Wake'; end % name for sleep stages included in scoring. Default: 'N1 N2 N3 REM Wake'.
 
 %% OPTIONAL PARAMETERS
 eventName = {'SWpos','SWneg'}; % name of event. Default: {'SWpos','SWneg'}.
@@ -74,7 +77,8 @@ LPattenuation = 10;
 HPorder = 3;
 HPfreq = 0.4;
 HPattenuation = 10;
-targetLPfreq = 2; % target lowpass frequency
+targetLPfreq = 2; % target lowpass frequency: use 2 for target of 2 Hz, or use 4 for target of 4Hz
+% use fvtool(lp,hp) after building filters below to visualize
 
 %% PROCESS FILE
 disp(['Processing dataset: ' EEG.setname '...'])
@@ -82,6 +86,7 @@ disp(['Processing dataset: ' EEG.setname '...'])
 %% build the results table
 ID = [];
 CH = [];
+sleepStage = [];
 firstHWlatency = [];
 secondHWlatency = [];
 segUpHWperiod = [];
@@ -99,8 +104,8 @@ segDownHWrecamp = [];
 segDownHWupslope = [];
 segDownHWdownslope = [];
 
-SW = table(ID,CH,firstHWlatency,segUpHWperiod,segUpHWfreq,segUpHWpeak,segUpHWintamp,segUpHWrecamp,segUpHWupslope,segUpHWdownslope,secondHWlatency,segDownHWperiod,segDownHWfreq,segDownHWpeak,segDownHWintamp,segDownHWrecamp,segDownHWupslope,segDownHWdownslope,...
-    'VariableNames',{'ID','Channel','firstLatency','posDur','posFreq','posPeakAmp','posArea','posAvgAmp','posUpSlope','posDownSlope','secondLatency','negDur','negFreq','negPeakAmp','negArea','negAvgAmp','negUpSlope','negDownSlope'});
+SW = table(ID,CH,sleepStage,firstHWlatency,segUpHWperiod,segUpHWfreq,segUpHWpeak,segUpHWintamp,segUpHWrecamp,segUpHWupslope,segUpHWdownslope,secondHWlatency,segDownHWperiod,segDownHWfreq,segDownHWpeak,segDownHWintamp,segDownHWrecamp,segDownHWupslope,segDownHWdownslope,...
+    'VariableNames',{'ID','Channel','sleepStage','firstLatency','posDur','posFreq','posPeakAmp','posArea','posAvgAmp','posUpSlope','posDownSlope','secondLatency','negDur','negFreq','negPeakAmp','negArea','negAvgAmp','negUpSlope','negDownSlope'});
 
 %% find channels of interest
 ChName = {EEG.chanlocs.labels};
@@ -117,8 +122,14 @@ data = double(EEG.data(chIdx,:)); % filtfilt needs double precision data. Note: 
 clear n nChOI chIdx
 
 %% filter the EEG channels of interest
+disp('Filtering the data...')
+
+% build the filter
 lp = designfilt('lowpassiir', 'FilterOrder', LPorder, 'StopbandFrequency', LPfreq, 'StopbandAttenuation', LPattenuation, 'SampleRate', EEG.srate);
 hp = designfilt('highpassiir', 'FilterOrder', HPorder, 'StopbandFrequency', HPfreq, 'StopbandAttenuation', HPattenuation, 'SampleRate', EEG.srate);
+% fvtool(lp,hp) % use to visualize filters
+
+% filter the data
 datafilt = zeros(size(data));
 for n=1:size(data,1)
     filtCh = filtfilt(lp,data(n,:));
@@ -130,7 +141,7 @@ clear hp lp filtCh n data
 %% process each channel
 for nch=1:size(datafilt,1)
     
-    disp(['Processing channel: ' ChOI{nch} '...'])
+    disp(['Processing channel: ' num2str(nch) ' of ' num2str(size(datafilt,1)) ' ...'])
     
     % find zero-crossings
     xdiff = diff(sign(datafilt(nch,:)));
@@ -140,60 +151,41 @@ for nch=1:size(datafilt,1)
     clear xdiff
     
     % segment data into half waves
-    if length(idx_up) < length(idx_down) % so that you don't exceed the length of idx
-        for n=1:length(idx_up)-1
-            if idx_up(1) < idx_down(1) % which one is first?
-                segUp{n} = datafilt(nch,idx_up(n)+1:idx_down(n));
-                segDown{n} = datafilt(nch,idx_down(n)+1:idx_up(n+1));
-            elseif idx_up(1) > idx_down(1)
-                segUp{n} = datafilt(nch,idx_down(n)+1:idx_up(n));
-                segDown{n} = datafilt(nch,idx_up(n)+1:idx_down(n+1));
-            end
-        end
-    elseif length(idx_up) > length(idx_down) % so that you don't exceed the length of idx
-        for n=1:length(idx_down)-1
-            if idx_up(1) < idx_down(1) % which one is first?
-                segUp{n} = datafilt(nch,idx_up(n)+1:idx_down(n));
-                segDown{n} = datafilt(nch,idx_down(n)+1:idx_up(n+1));
-            elseif idx_up(1) > idx_down(1)
-                segUp{n} = datafilt(nch,idx_down(n)+1:idx_up(n));
-                segDown{n} = datafilt(nch,idx_up(n)+1:idx_down(n+1));
-            end
-        end
-    else % then they must be the same length
-        for n=1:length(idx_up)-1
-            if idx_up(1) < idx_down(1) % which one is first?
-                segUp{n} = datafilt(nch,idx_up(n)+1:idx_down(n));
-                segDown{n} = datafilt(nch,idx_down(n)+1:idx_up(n+1));
-            elseif idx_up(1) > idx_down(1)
-                segUp{n} = datafilt(nch,idx_down(n)+1:idx_up(n));
-                segDown{n} = datafilt(nch,idx_up(n)+1:idx_down(n+1));
-            end
+    disp('Segmenting into half-waves...')
+    for n=1:min(length(idx_up),length(idx_down))-1 % take min so that you don't exceed the length of idx
+        if idx_up(1) < idx_down(1) % which one is first?
+            segUp{n} = datafilt(nch,idx_up(n)+1:idx_down(n));
+            segDown{n} = datafilt(nch,idx_down(n)+1:idx_up(n+1));
+        elseif idx_up(1) > idx_down(1)
+            segUp{n} = datafilt(nch,idx_down(n)+1:idx_up(n));
+            segDown{n} = datafilt(nch,idx_up(n)+1:idx_down(n+1));
         end
     end
     
-    % verify that polarity is correct
+    % verify that polarity of HWs are correct
     if sign(segUp{1}(1)) ~= 1 && sign(segDown{1}(1)) ~= -1
         for nSeg=1:length(segUp)
             segUp{nSeg}=segUp{nSeg}*-1;
             segDown{nSeg}=segDown{nSeg}*-1;
         end
     end
-
+    
     % identify and count HWs > peak amplitude threshold & longer than high freq cut-off
-    % e.g., slow waves: 75 uV peak-to-peak, 37.5 uV for positive or
-    % negative half-waves e.g., > 0.25 sec (re; impossible to have a SW <2Hz happen in that time)
+    % e.g., slow waves: 75 uV peak-to-peak, 37.5 uV for positive or negative half-waves
+    % e.g., > 0.125 sec (re; impossible to have a SW <4Hz happen in that time)
     segUpDetect = false(1,length(segUp));
     for n=1:length(segUp)
-        segUpDetect(n) = logical(max(abs(segUp{n}))>37.5 && length(segUp{n})>1/targetLPfreq*EEG.srate/2 && max(abs(segDown{n}))<37.5 && length(segDown{n})>1/targetLPfreq*EEG.srate/2);
+        segUpDetect(n) = logical((max(abs(segUp{n}))>37.5 && length(segUp{n})>1/targetLPfreq*EEG.srate/2) && (max(abs(segDown{n}))>37.5 && length(segDown{n})>1/targetLPfreq*EEG.srate/2));
     end
     segDownDetect = false(1,length(segDown));
     for n=1:length(segDown)
-        segDownDetect(n) = logical(max(abs(segDown{n}))<37.5 && length(segDown{n})>1/targetLPfreq*EEG.srate/2 && max(abs(segUp{n}))>37.5 && length(segUp{n})>1/targetLPfreq*EEG.srate/2);
+        segDownDetect(n) = logical((max(abs(segDown{n}))>37.5 && length(segDown{n})>1/targetLPfreq*EEG.srate/2) && (max(abs(segUp{n}))>37.5 && length(segUp{n})>1/targetLPfreq*EEG.srate/2));
     end
     
     % compute HW period, frequency, peak amplitude, peak, integrated (i.e., area under curve: sum of rectified values * 1/srate),
     % rectified amplitude (i.e., avg amplitude: integrated amplitude/HW period) and up (crossing to peak) and down (peak to crossing) slope
+    
+    disp('Measuring half-waves...')
     
     segUpHWperiod = NaN(size(segUp));
     segUpHWfreq = NaN(size(segUp));
@@ -240,6 +232,7 @@ for nch=1:size(datafilt,1)
     end
     
     %% mark events on the EEG
+    disp('Marking events on the EEG dataset...')
     if ~isfield(EEG.event,'channel')
         for i=1:length(EEG.event)
             EEG.event(i).channel = ''; % add empty channel field
@@ -344,7 +337,31 @@ for nch=1:size(datafilt,1)
     EEG = eeg_checkset(EEG, 'eventconsistency');
     EEG = eeg_checkset(EEG);
     
+    %% label SW events with sleep stage
+    disp('Finding sleep stage label for each SW event...')
+    Event = EEG.event;
+    
+    if ~isfield(Event,'SleepStage')
+        for i = 1:length(Event)
+            Event(i).SleepStage = ''; % initialization
+        end
+    end
+    
+    evtIdx = find(ismember({Event.type},eventName));
+    allSleepStages = strsplit(allSleepStages,' ');
+    
+    for iEvt = evtIdx % loop on event
+        lastScoring = find(ismember({Event(1:iEvt).type},allSleepStages),1,'last');
+        if ~isempty(lastScoring)
+            Event(iEvt).SleepStage = Event(lastScoring).type;
+        else
+            Event(iEvt).SleepStage = '';
+        end
+    end
+    EEG.event = Event;
+    
     %% populate table with results
+    disp('Creating results table...')
     ID = [];
     CH = [];
     nevt = 1; % valid event counter
@@ -352,6 +369,7 @@ for nch=1:size(datafilt,1)
         for n=1:length(segDownDetect)
             ID{n} = EEG.setname;
             CH{n} = ChOI{nch};
+            sleepStage{n} = NaN;
             if idx_up(1) < idx_down(1) % which one is first?
                 if segUpDetect(n) == 1
                     firstHWlatency{n} = eventsUp(nevt).latency;
@@ -375,6 +393,7 @@ for nch=1:size(datafilt,1)
         for n=1:length(segUpDetect)
             ID{n} = EEG.setname;
             CH{n} = ChOI{nch};
+            sleepStage{n} = NaN;
             if idx_up(1) < idx_down(1) % which one is first?
                 if segUpDetect(n) == 1
                     firstHWlatency{n} = eventsUp(nevt).latency;
@@ -396,17 +415,18 @@ for nch=1:size(datafilt,1)
             end
         end
     end
-    SWnew = table(ID',CH',firstHWlatency',segUpHWperiod',segUpHWfreq',segUpHWpeak',segUpHWintamp',segUpHWrecamp',segUpHWupslope',segUpHWdownslope',secondHWlatency',segDownHWperiod',segDownHWfreq',segDownHWpeak',segDownHWintamp',segDownHWrecamp',segDownHWupslope',segDownHWdownslope',...
-        'VariableNames',{'ID','Channel','firstLatency','posDur','posFreq','posPeakAmp','posArea','posAvgAmp','posUpSlope','posDownSlope','secondLatency','negDur','negFreq','negPeakAmp','negArea','negAvgAmp','negUpSlope','negDownSlope'});
+    SWnew = table(ID',CH',sleepStage',firstHWlatency',segUpHWperiod',segUpHWfreq',segUpHWpeak',segUpHWintamp',segUpHWrecamp',segUpHWupslope',segUpHWdownslope',secondHWlatency',segDownHWperiod',segDownHWfreq',segDownHWpeak',segDownHWintamp',segDownHWrecamp',segDownHWupslope',segDownHWdownslope',...
+            'VariableNames',{'ID','Channel','sleepStage','firstLatency','posDur','posFreq','posPeakAmp','posArea','posAvgAmp','posUpSlope','posDownSlope','secondLatency','negDur','negFreq','negPeakAmp','negArea','negAvgAmp','negUpSlope','negDownSlope'});
     SW = [SW ; SWnew];
     
-    clear segUpDetect segDownDetect segUp segDown idx_up idx_down firstHWlatency secondHWlatency
+    clear sleepStage segUpDetect segDownDetect segUp segDown idx_up idx_down firstHWlatency secondHWlatency
     clear segUpHWperiod segUpHWfreq segUpHWpeak segUpHWintamp segUpHWrecamp segUpHWupslope segUpHWdownslope segDownHWperiod segDownHWfreq segDownHWpeak segDownHWintamp segDownHWrecamp segDownHWupslope segDownHWdownslope segDownHWpeakLat segUpHWpeakLat
-    clear eventsUp eventsDown i n nevt
+    clear eventsUp eventsDown i n nevt SWnew
     
 end
 
 %% mark for delete SW during movement artifact
+disp('Deleting false positives...')
 Event = EEG.event;
 evtIdx = find(ismember({Event.type},eventName));
 ToRmv = [];
@@ -442,6 +462,17 @@ EEG.event(ToRmv) = []; % delete
 EEG = eeg_checkset(EEG, 'eventconsistency');
 eeg_checkset(EEG);
 
+%% find sleep stages for SW events and add to results table
+disp('Adding sleep stages to results table...')
+nEvt = 1;
+for nRow = 1:height(SW)
+    evtTemp = find([EEG.event(:).latency]' == SW.firstLatency{nRow});
+    evt(nEvt) = evtTemp(1);
+    nEvt = nEvt + 1;
+end
+stage = {EEG.event(evt).SleepStage}';
+SW(height(SW)-length(stage)+1:end,3) = stage; % this is a little tricky, but it should do the job
+clear evt evtTemp
 
 %% SELECT OUTPUT DIRECTORY
 disp('Please select a directory in which to save the results.');

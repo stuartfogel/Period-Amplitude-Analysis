@@ -9,6 +9,7 @@ function [EEG,com] = pop_PAA(EEG)
 % Input:
 % ChOI = list of channel labels to run PAA, e.g., {'F3','Fz','F4'}
 % badData = label for bad data event type, e.g., 'Movement'
+% allSleepStages = all sleep stages included in scoring, e.g., {'N1','N2','N3','R','W'}
 %
 % Requires:
 % eeglab *.set file, ideally already sleep stage scored and movement
@@ -17,6 +18,7 @@ function [EEG,com] = pop_PAA(EEG)
 % Output results table variables:
 % 'ID': filename
 % 'Channel': EEG channel (user-defined)
+% 'sleepStage': Sleep Stage that the first part of the half wave occurs in
 % 'firstLatency': latency of first half-wave in data points
 % 'posDur': positive half-wave period in sec
 % 'posFreq': positive half-wave ocsillatory frequency in Hz
@@ -34,7 +36,11 @@ function [EEG,com] = pop_PAA(EEG)
 % 'negUpSlope': negative half-wave upward slope in uV/sec
 % 'negDownSlope': negative half-wave downward slope in uV/sec
 %
-% June 24, 2020
+% June 24, 2020 Version 1.0
+% Aug 27, 2020  Revised 1.1 Critical bug fixes: ch order, polarity, channel
+% labels
+% Sept 13, 2020  Revised 1.2 included sleep stages in output and SW events,
+% fixed bug for SW inclusion criteria, optimised code
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
@@ -56,8 +62,8 @@ end
 
 % GUI geometry setup
 g = [3, 2];
-geometry = {1,g,1,[2 2 1]};
-geomvert = [1 1 1 1];
+geometry = {1,g,g,1,[2 2 1]};
+geomvert = [1 1 1 1 1];
 
 % select channels
 cb_chan = 'pop_chansel(get(gcbf, ''userdata''), ''field'', ''labels'', ''handle'', findobj(''parent'', gcbf, ''tag'', ''ChOI''));';
@@ -66,6 +72,8 @@ cb_chan = 'pop_chansel(get(gcbf, ''userdata''), ''field'', ''labels'', ''handle'
 uilist = { ...
     ... label settings
     {'style', 'text', 'string', 'PAA for slow wave (0.5-2Hz, >75uV) detection'} ...
+    {'style', 'text', 'string', 'Label for sleep stages'} ...
+    {'style', 'edit', 'string', 'N1 N2 N3 REM Wake' 'tag' 'allSleepStages'} ...
     {'style', 'text', 'string', 'Label for bad data'} ...
     {'style', 'edit', 'string', 'Movement' 'tag' 'badData'} ...
     ... channel options
@@ -92,15 +100,16 @@ result = inputgui('geometry', geometry, 'geomvert', geomvert, 'uilist', uilist, 
 
 % launch PAA
 if ~isempty(result)
-    badData = result{1};
-    ChOI = result{2};
+    allSleepStages = result{1};
+    badData = result{2};
+    ChOI = result{3};
     % launch pipeline
-    [EEG] = PAA(EEG,ChOI,badData);
+    [EEG] = PAA(EEG,ChOI,badData,allSleepStages);
 else
     com = '';
     return
 end
 
-com = sprintf('EEG = PAA(%s,%s,%s);',inputname(1),ChOI,badData);
+com = sprintf('EEG = PAA(%s,%s,%s,%s);',inputname(1),ChOI,badData,allSleepStages);
 
 end
