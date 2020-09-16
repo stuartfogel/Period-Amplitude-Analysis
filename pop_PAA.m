@@ -36,11 +36,13 @@ function [EEG,com] = pop_PAA(EEG)
 % 'negUpSlope': negative half-wave upward slope in uV/sec
 % 'negDownSlope': negative half-wave downward slope in uV/sec
 %
-% June 24, 2020 Version 1.0
-% Aug 27, 2020  Revised 1.1 Critical bug fixes: ch order, polarity, channel
+% June 24, 2020  Version 1.0
+% Aug 27, 2020   Revised 1.1 Critical bug fixes: ch order, polarity, channel
 % labels
 % Sept 13, 2020  Revised 1.2 included sleep stages in output and SW events,
 % fixed bug for SW inclusion criteria, optimised code
+% Sept 16, 2020  Revised 1.3 negative slope calculation bug fixed. Improved
+% detection criteria to include any adjacent HWs
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %

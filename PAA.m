@@ -17,28 +17,22 @@ function [EEG] = PAA(EEG,ChOI,badData,allSleepStages)
 % Output results table variables:
 % 'ID': filename
 % 'Channel': EEG channel (user-defined)
-% 'firstLatency': latency of first half-wave in data points
-% 'posDur': positive half-wave period in sec
-% 'posFreq': positive half-wave ocsillatory frequency in Hz
-% 'posPeakAmp': positive half-wave peak amplitude in uV
-% 'posArea': positive half-wave area under the curve (i.e., integrated amplitude = sum of rectified values * 1/srate) in uV*sec
-% 'posAvgAmp': positive half-wave average amplitude (i.e., rectified amplitude = integrated amplitude/period) in uV
-% 'posUpSlope': positive half-wave upward slope in uV/sec
-% 'posDownSlope': positive half-wave downward slope in uV/sec
-% 'secondLatency': latency of second half-wave in data points
-% 'negDur': negative half-wave period in sec
-% 'negFreq': negative half-wave ocsillatory frequency in Hz
-% 'negPeakAmp': negative half-wave peak amplitude in uV
-% 'negArea': negative half-wave area under the curve (i.e., integrated amplitude = sum of rectified values * 1/srate) in uV*sec
-% 'negAvgAmp': negative half-wave average amplitude (i.e., rectified amplitude = integrated amplitude/period) in uV
-% 'negUpSlope': negative half-wave upward slope in uV/sec
-% 'negDownSlope': negative half-wave downward slope in uV/sec
+% 'Latency': latency of first half-wave in data points
+% 'Duration': positive half-wave period in sec
+% 'Frequency': positive half-wave ocsillatory frequency in Hz
+% 'PeakAmp': positive half-wave peak amplitude in uV
+% 'Area': positive half-wave area under the curve (i.e., integrated amplitude = sum of rectified values * 1/srate) in uV*sec
+% 'AvgAmp': positive half-wave average amplitude (i.e., rectified amplitude = integrated amplitude/period) in uV
+% 'UpSlope': positive half-wave upward slope in uV/sec
+% 'DownSlope': positive half-wave downward slope in uV/sec
 %
 % June 24, 2020 Version 1.0
 % Aug  27, 2020 Revised 1.1 Critical bug fixes: ch order, polarity, channel
 % labels
 % Sept 13, 2020 Revised 1.2 included sleep stages in output and SW events,
 % fixed bug for SW inclusion criteria, optimised code
+% Sept 16, 2020 Revised 1.3 negative slope calculation bug fixed. Improved
+% detection criteria to include any adjacent HWs
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
@@ -87,25 +81,17 @@ disp(['Processing dataset: ' EEG.setname '...'])
 ID = [];
 CH = [];
 sleepStage = [];
-firstHWlatency = [];
-secondHWlatency = [];
-segUpHWperiod = [];
-segUpHWfreq = [];
-segUpHWpeak = [];
-segUpHWintamp = [];
-segUpHWrecamp = [];
-segUpHWupslope = [];
-segUpHWdownslope = [];
-segDownHWperiod = [];
-segDownHWfreq = [];
-segDownHWpeak = [];
-segDownHWintamp = [];
-segDownHWrecamp = [];
-segDownHWupslope = [];
-segDownHWdownslope = [];
+HWlatency = [];
+HWperiod = [];
+HWfreq = [];
+HWpeak = [];
+HWintamp = [];
+HWrecamp = [];
+HWupslope = [];
+HWdownslope = [];
 
-SW = table(ID,CH,sleepStage,firstHWlatency,segUpHWperiod,segUpHWfreq,segUpHWpeak,segUpHWintamp,segUpHWrecamp,segUpHWupslope,segUpHWdownslope,secondHWlatency,segDownHWperiod,segDownHWfreq,segDownHWpeak,segDownHWintamp,segDownHWrecamp,segDownHWupslope,segDownHWdownslope,...
-    'VariableNames',{'ID','Channel','sleepStage','firstLatency','posDur','posFreq','posPeakAmp','posArea','posAvgAmp','posUpSlope','posDownSlope','secondLatency','negDur','negFreq','negPeakAmp','negArea','negAvgAmp','negUpSlope','negDownSlope'});
+SW = table(ID,CH,sleepStage,HWlatency,HWperiod,HWfreq,HWpeak,HWintamp,HWrecamp,HWupslope,HWdownslope,...
+    'VariableNames',{'ID','Channel','sleepStage','Latency','Duration','Frequency','PeakAmp','Area','AvgAmp','UpSlope','DownSlope'});
 
 %% find channels of interest
 ChName = {EEG.chanlocs.labels};
@@ -175,11 +161,25 @@ for nch=1:size(datafilt,1)
     % e.g., > 0.125 sec (re; impossible to have a SW <4Hz happen in that time)
     segUpDetect = false(1,length(segUp));
     for n=1:length(segUp)
-        segUpDetect(n) = logical((max(abs(segUp{n}))>37.5 && length(segUp{n})>1/targetLPfreq*EEG.srate/2) && (max(abs(segDown{n}))>37.5 && length(segDown{n})>1/targetLPfreq*EEG.srate/2));
+        if n == length(segUp) % catch exceed end of array
+            break
+        end
+        if idx_up(1) < idx_down(1) % which one is first?
+            segUpDetect(n) = logical((max(abs(segUp{n}))>37.5 && length(segUp{n})>1/targetLPfreq*EEG.srate/2) && ((max(abs(segDown{n}))>37.5 && length(segDown{n})>1/targetLPfreq*EEG.srate/2) || (max(abs(segDown{n-1}))>37.5 && length(segDown{n-1})>1/targetLPfreq*EEG.srate/2)));
+        else
+            segUpDetect(n) = logical((max(abs(segUp{n}))>37.5 && length(segUp{n})>1/targetLPfreq*EEG.srate/2) && ((max(abs(segDown{n}))>37.5 && length(segDown{n})>1/targetLPfreq*EEG.srate/2) || (max(abs(segDown{n+1}))>37.5 && length(segDown{n+1})>1/targetLPfreq*EEG.srate/2)));
+        end
     end
     segDownDetect = false(1,length(segDown));
     for n=1:length(segDown)
-        segDownDetect(n) = logical((max(abs(segDown{n}))>37.5 && length(segDown{n})>1/targetLPfreq*EEG.srate/2) && (max(abs(segUp{n}))>37.5 && length(segUp{n})>1/targetLPfreq*EEG.srate/2));
+        if n == length(segDown) % catch exceed end of array
+            break
+        end
+        if idx_up(1) < idx_down(1) % which one is first?
+            segDownDetect(n) = logical((max(abs(segDown{n}))>37.5 && length(segDown{n})>1/targetLPfreq*EEG.srate/2) && ((max(abs(segUp{n}))>37.5 && length(segUp{n})>1/targetLPfreq*EEG.srate/2) || (max(abs(segUp{n+1}))>37.5 && length(segUp{n+1})>1/targetLPfreq*EEG.srate/2)));
+        else
+            segDownDetect(n) = logical((max(abs(segDown{n}))>37.5 && length(segDown{n})>1/targetLPfreq*EEG.srate/2) && ((max(abs(segUp{n}))>37.5 && length(segUp{n})>1/targetLPfreq*EEG.srate/2) || (max(abs(segUp{n-1}))>37.5 && length(segUp{n-1})>1/targetLPfreq*EEG.srate/2)));
+        end
     end
     
     % compute HW period, frequency, peak amplitude, peak, integrated (i.e., area under curve: sum of rectified values * 1/srate),
@@ -187,49 +187,59 @@ for nch=1:size(datafilt,1)
     
     disp('Measuring half-waves...')
     
-    segUpHWperiod = NaN(size(segUp));
-    segUpHWfreq = NaN(size(segUp));
-    segUpHWpeak = NaN(size(segUp));
-    segUpHWintamp = NaN(size(segUp));
-    segUpHWrecamp = NaN(size(segUp));
-    segUpHWpeakLat = NaN(size(segUp));
-    segUpHWupslope = NaN(size(segUp));
-    segUpHWdownslope = NaN(size(segUp));
+    upHWperiod = NaN(1,length(segUp));
+    upHWfreq = NaN(1,length(segUp));
+    upHWpeak = NaN(1,length(segUp));
+    upHWintamp = NaN(1,length(segUp));
+    upHWrecamp = NaN(1,length(segUp));
+    upHWpeakLat = NaN(1,length(segUp));
+    upHWupslope = NaN(1,length(segUp));
+    upHWdownslope = NaN(1,length(segUp));
     
     for n=1:length(segUp)
         if segUpDetect(n) == 1
-            segUpHWperiod(n) = length(segUp{n})/EEG.srate; % compute HW period
-            segUpHWfreq(n) = 1/segUpHWperiod(n); % compute frequency of HW (1/period)
-            segUpHWpeak(n) = max(segUp{n}); % compute peak amplitude
-            segUpHWintamp(n) = abs(sum(segUp{n}))*1/EEG.srate; % compute integrated amplitude
-            segUpHWrecamp(n) = segUpHWintamp(n)/segUpHWperiod(n); % compute rectified amplitude
-            segUpHWpeakLat(n) = find(segUp{n} == max(segUp{n})); % compute peak latency
-            segUpHWupslope(n) = segUpHWpeak(n)/(segUpHWpeakLat(n)/EEG.srate*1000); % compute upward slope in uV/ms
-            segUpHWdownslope(n) = segUpHWpeak(n)/(length(segUp{n})-segUpHWpeakLat(n)/EEG.srate*1000); % compute downward slope in uV/ms
+            upHWperiod(n) = length(segUp{n})/EEG.srate; % compute HW period
+            upHWfreq(n) = 1/upHWperiod(n); % compute frequency of HW (1/period)
+            upHWpeak(n) = max(segUp{n}); % compute peak amplitude
+            upHWintamp(n) = abs(sum(segUp{n}))*1/EEG.srate; % compute integrated amplitude
+            upHWrecamp(n) = upHWintamp(n)/upHWperiod(n); % compute rectified amplitude
+            upHWpeakLat(n) = find(segUp{n} == max(segUp{n})); % compute peak latency
+            upHWupslope(n) = upHWpeak(n)/(upHWpeakLat(n)/EEG.srate*1000); % compute upward slope in uV/ms
+            upHWdownslope(n) = (upHWpeak(n)/((length(segUp{n})-upHWpeakLat(n))/EEG.srate*1000))*-1; % compute downward slope in uV/ms
         end
     end
     
-    segDownHWperiod = NaN(size(segDown));
-    segDownHWfreq = NaN(size(segDown));
-    segDownHWpeak = NaN(size(segDown));
-    segDownHWintamp = NaN(size(segDown));
-    segDownHWrecamp = NaN(size(segDown));
-    segDownHWpeakLat = NaN(size(segUp));
-    segDownHWupslope = NaN(size(segDown));
-    segDownHWdownslope = NaN(size(segDown));
+    downHWperiod = NaN(1,length(segDown));
+    downHWfreq = NaN(1,length(segDown));
+    downHWpeak = NaN(1,length(segDown));
+    downHWintamp = NaN(1,length(segDown));
+    downHWrecamp = NaN(1,length(segDown));
+    downHWpeakLat = NaN(1,length(segDown));
+    downHWupslope = NaN(1,length(segDown));
+    downHWdownslope = NaN(1,length(segDown));
     
-    for n=1:length(segDown)
+    for n = 1:length(segDown)
         if segDownDetect(n) == 1
-            segDownHWperiod(n) = length(segDown{n})/EEG.srate; % compute HW period
-            segDownHWfreq(n) = 1/segDownHWperiod(n); % compute frequency of HW (1/period)
-            segDownHWpeak(n) = min(segDown{n}); % compute peak amplitude
-            segDownHWintamp(n) = abs(sum(segDown{n}))*1/EEG.srate; % compute integrated amplitude
-            segDownHWrecamp(n) = segDownHWintamp(n)/segDownHWperiod(n); % compute rectified amplitude
-            segDownHWpeakLat(n) = find(segDown{n} == min(segDown{n})); % compute peak latency
-            segDownHWupslope(n) = segDownHWpeak(n)/(segDownHWpeakLat(n)/EEG.srate*1000); % compute upward slope in uV/ms
-            segDownHWdownslope(n) = segDownHWpeak(n)/(length(segDown{n})-segDownHWpeakLat(n)/EEG.srate*1000); % compute downward slope in uV/ms
+            downHWperiod(n) = length(segDown{n})/EEG.srate; % compute HW period
+            downHWfreq(n) = 1/downHWperiod(n); % compute frequency of HW (1/period)
+            downHWpeak(n) = min(segDown{n}); % compute peak amplitude
+            downHWintamp(n) = abs(sum(segDown{n}))*1/EEG.srate; % compute integrated amplitude
+            downHWrecamp(n) = downHWintamp(n)/downHWperiod(n); % compute rectified amplitude
+            downHWpeakLat(n) = find(segDown{n} == min(segDown{n})); % compute peak latency
+            downHWupslope(n) = (downHWpeak(n)/(downHWpeakLat(n)/EEG.srate*1000))*-1; % compute upward slope in uV/ms
+            downHWdownslope(n) = downHWpeak(n)/((length(segDown{n})-downHWpeakLat(n))/EEG.srate*1000); % compute downward slope in uV/ms
         end
     end
+    
+    % concatenate up and down segments
+    HWperiod = [upHWperiod, downHWperiod];
+    HWfreq = [upHWfreq, downHWfreq];
+    HWpeak = [upHWpeak, downHWpeak];
+    HWintamp = [upHWintamp, downHWintamp];
+    HWrecamp = [upHWrecamp, downHWrecamp];
+    HWpeakLat = [upHWpeakLat, downHWpeakLat];
+    HWupslope = [upHWupslope, downHWupslope];
+    HWdownslope = [upHWdownslope, downHWdownslope];
     
     %% mark events on the EEG
     disp('Marking events on the EEG dataset...')
@@ -246,91 +256,47 @@ for nch=1:size(datafilt,1)
     clear fields
     
     % add each HW SW event to the empty EEGlab event structure
-    if idx_up(1) < idx_down(1) % which one is first?
-        latency = startDelay;
-        nevt = 1; % valid event counter
-        for n = 1:length(segUpDetect)
-            if segUpDetect(n) == 1
-                eventsUp(nevt).type = eventName{1};
-                if isempty(peaks)
-                    eventsUp(nevt).latency = latency;
-                    eventsUp(nevt).duration = segUpHWperiod(n)*EEG.srate;
-                else
-                    eventsUp(nevt).latency = latency + segUpHWpeakLat(n);
-                    eventsUp(nevt).duration = 1; % one sample peak marker
-                end
-                eventsUp(nevt).channel = find(strcmp(ChName, ChOI{nch}));
-                eventsUp(nevt).urevent = [];
-                nevt = nevt + 1; % valid event counter
-            end
-            latency = latency + length(segUp{n}) + length(segDown{n});
-        end
-        latency = startDelay + length(segUp{1});
-        nevt = 1; % valid event counter
-        for n = 1:length(segDownDetect)
-            if segDownDetect(n) == 1
-                eventsDown(nevt).type = eventName{2};
-                if isempty(peaks)
-                    eventsDown(nevt).latency = latency;
-                    eventsDown(nevt).duration = segDownHWperiod(n)*EEG.srate;
-                else
-                    eventsDown(nevt).latency = latency + segDownHWpeakLat(n);
-                    eventsDown(nevt).duration = 1; % one sample peak marker
-                end
-                eventsDown(nevt).channel = find(strcmp(ChName, ChOI{nch}));
-                eventsDown(nevt).urevent = [];
-                nevt = nevt + 1; % valid event counter
-            end
-            if n == length(segUp) % catch exceed end of array
-                break
+    latency = startDelay;
+    nevt = 1; % valid event counter
+    for n = 1:length(segUpDetect)
+        if segUpDetect(n) == 1
+            eventsUp(nevt).type = eventName{1};
+            if isempty(peaks)
+                eventsUp(nevt).latency = latency;
+                eventsUp(nevt).duration = upHWperiod(n)*EEG.srate;
             else
-                latency = latency + length(segUp{n+1}) + length(segDown{n});
+                eventsUp(nevt).latency = latency + upHWpeakLat(n);
+                eventsUp(nevt).duration = 1; % one sample peak marker
             end
+            eventsUp(nevt).channel = find(strcmp(ChName, ChOI{nch}));
+            eventsUp(nevt).urevent = [];
+            nevt = nevt + 1; % valid event counter
         end
-        clear latency
-    elseif idx_up(1) > idx_down(1)
-        latency = startDelay + length(segDown{1});
-        nevt = 1; % valid event counter
-        for n = 1:length(segUpDetect)
-            if segUpDetect(n) == 1
-                eventsUp(nevt).type = eventName{1};
-                if isempty(peaks)
-                    eventsUp(nevt).latency = latency;
-                    eventsUp(nevt).duration = segUpHWperiod(n)*EEG.srate;
-                else
-                    eventsUp(nevt).latency = latency + segUpHWpeakLat(n);
-                    eventsUp(nevt).duration = 1; % one sample peak marker
-                end
-                eventsUp(nevt).channel = find(strcmp(ChName, ChOI{nch}));
-                eventsUp(nevt).urevent = [];
-                nevt = nevt + 1; % valid event counter
-            end
-            if n == length(segDown) % catch exceed end of array
-                break
-            else
-                latency = latency + length(segUp{n}) + length(segDown{n+1});
-            end
-        end
-        latency = startDelay;
-        nevt = 1; % valid event counter
-        for n = 1:length(segDownDetect)
-            if segDownDetect(n) == 1
-                eventsDown(nevt).type = eventName{2};
-                if isempty(peaks)
-                    eventsDown(nevt).latency = latency;
-                    eventsDown(nevt).duration = segDownHWperiod(n)*EEG.srate;
-                else
-                    eventsDown(nevt).latency = latency + segDownHWpeakLat(n);
-                    eventsDown(nevt).duration = 1; % one sample peak marker
-                end
-                eventsDown(nevt).channel = find(strcmp(ChName, ChOI{nch}));
-                eventsDown(nevt).urevent = [];
-                nevt = nevt + 1; % valid event counter
-            end
-            latency = latency + length(segUp{n}) + length(segDown{n});
-        end
-        clear latency
+        latency = latency + length(segUp{n}) + length(segDown{n});
     end
+    latency = startDelay + length(segUp{1});
+    nevt = 1; % valid event counter
+    for n = 1:length(segDownDetect)
+        if segDownDetect(n) == 1
+            eventsDown(nevt).type = eventName{2};
+            if isempty(peaks)
+                eventsDown(nevt).latency = latency;
+                eventsDown(nevt).duration = downHWperiod(n)*EEG.srate;
+            else
+                eventsDown(nevt).latency = latency + downHWpeakLat(n);
+                eventsDown(nevt).duration = 1; % one sample peak marker
+            end
+            eventsDown(nevt).channel = find(strcmp(ChName, ChOI{nch}));
+            eventsDown(nevt).urevent = [];
+            nevt = nevt + 1; % valid event counter
+        end
+        if n == length(segUp) % catch exceed end of array
+            break
+        else
+            latency = latency + length(segUp{n+1}) + length(segDown{n});
+        end
+    end
+    clear latency
     
     % concatenate event structures and sort
     EEG.event = [EEG.event eventsUp eventsDown];
@@ -362,66 +328,52 @@ for nch=1:size(datafilt,1)
     
     %% populate table with results
     disp('Creating results table...')
-    ID = [];
-    CH = [];
-    nevt = 1; % valid event counter
-    if length(segDownDetect) > length(segUpDetect) % just in case they differ in length, which should never be the case!
-        for n=1:length(segDownDetect)
-            ID{n} = EEG.setname;
-            CH{n} = ChOI{nch};
-            sleepStage{n} = NaN;
-            if idx_up(1) < idx_down(1) % which one is first?
-                if segUpDetect(n) == 1
-                    firstHWlatency{n} = eventsUp(nevt).latency;
-                    secondHWlatency{n} = eventsDown(nevt).latency;
-                    nevt = nevt + 1; % valid event counter
-                else
-                    firstHWlatency{n} = NaN;
-                end
-            elseif idx_up(1) > idx_down(1)
-                if segDownDetect(n) == 1
-                    firstHWlatency{n} = eventsDown(nevt).latency;
-                    secondHWlatency{n} = eventsUp(nevt).latency;
-                    nevt = nevt + 1; % valid event counter
-                else
-                    firstHWlatency{n} = NaN;
-                    secondHWlatency{n} = NaN;
-                end
-            end
-        end
-    else
-        for n=1:length(segUpDetect)
-            ID{n} = EEG.setname;
-            CH{n} = ChOI{nch};
-            sleepStage{n} = NaN;
-            if idx_up(1) < idx_down(1) % which one is first?
-                if segUpDetect(n) == 1
-                    firstHWlatency{n} = eventsUp(nevt).latency;
-                    secondHWlatency{n} = eventsDown(nevt).latency;
-                    nevt = nevt + 1; % valid event counter
-                else
-                    firstHWlatency{n} = NaN;
-                    secondHWlatency{n} = NaN;
-                end
-            elseif idx_up(1) > idx_down(1)
-                if segDownDetect(n) == 1
-                    firstHWlatency{n} = eventsDown(nevt).latency;
-                    secondHWlatency{n} = eventsUp(nevt).latency;
-                    nevt = nevt + 1; % valid event counter
-                else
-                    firstHWlatency{n} = NaN;
-                    secondHWlatency{n} = NaN;
-                end
-            end
+    upID = [];
+    upCH = [];
+    downID = [];
+    downCH = [];
+    upSleepStage = [];
+    downSleepStage =[];
+    upEvt = 1; % valid event counter
+    downEvt = 1; % valid event counter
+    for n=1:length(segUpDetect)
+        upID{n} = EEG.setname;
+        upCH{n} = ChOI{nch};
+        upSleepStage{n} = NaN;
+        if segUpDetect(n) == 1
+            upHWlatency{n} = eventsUp(upEvt).latency;
+            upEvt = upEvt + 1; % valid event counter
+        else
+            upHWlatency{n} = NaN;
         end
     end
-    SWnew = table(ID',CH',sleepStage',firstHWlatency',segUpHWperiod',segUpHWfreq',segUpHWpeak',segUpHWintamp',segUpHWrecamp',segUpHWupslope',segUpHWdownslope',secondHWlatency',segDownHWperiod',segDownHWfreq',segDownHWpeak',segDownHWintamp',segDownHWrecamp',segDownHWupslope',segDownHWdownslope',...
-            'VariableNames',{'ID','Channel','sleepStage','firstLatency','posDur','posFreq','posPeakAmp','posArea','posAvgAmp','posUpSlope','posDownSlope','secondLatency','negDur','negFreq','negPeakAmp','negArea','negAvgAmp','negUpSlope','negDownSlope'});
+    for n=1:length(segDownDetect)
+        downID{n} = EEG.setname;
+        downCH{n} = ChOI{nch};
+        downSleepStage{n} = NaN;
+        if segDownDetect(n) == 1
+            downHWlatency{n} = eventsDown(downEvt).latency;
+            downEvt = downEvt + 1; % valid event counter
+        else
+            downHWlatency{n} = NaN;
+        end
+    end
+    
+    % concatenate
+    HWlatency = [upHWlatency, downHWlatency];
+    ID = [upID, downID];
+    CH = [upCH, downCH];
+    sleepStage = [upSleepStage, downSleepStage];
+    SWnew = table(ID',CH',sleepStage',HWlatency',HWperiod',HWfreq',HWpeak',HWintamp',HWrecamp',HWupslope',HWdownslope',...
+        'VariableNames',{'ID','Channel','sleepStage','Latency','Duration','Frequency','PeakAmp','Area','AvgAmp','UpSlope','DownSlope'});
     SW = [SW ; SWnew];
     
-    clear sleepStage segUpDetect segDownDetect segUp segDown idx_up idx_down firstHWlatency secondHWlatency
-    clear segUpHWperiod segUpHWfreq segUpHWpeak segUpHWintamp segUpHWrecamp segUpHWupslope segUpHWdownslope segDownHWperiod segDownHWfreq segDownHWpeak segDownHWintamp segDownHWrecamp segDownHWupslope segDownHWdownslope segDownHWpeakLat segUpHWpeakLat
-    clear eventsUp eventsDown i n nevt SWnew
+    % sort table by latency
+    SW = sortrows(SW,4);
+    
+    clear sleepStage segUpDetect segDownDetect segUp segDown idx_up idx_down
+    clear upID downID upCH downCH upSleepStage downSleepStage ID CH sleepStage HWlatency HWperiod HWfreq HWpeak HWintamp HWrecamp HWupslope HWdownslope HWpeakLat
+    clear eventsUp eventsDown i n upEvt downEvt SWnew
     
 end
 
@@ -447,7 +399,7 @@ SW=SW(~any(ismissing(SW),2),:);
 % find the SW marked as bad in the table by their latency
 iRow=[];
 for nEvt=ToRmv
-    row = find([SW.firstLatency{:}]' == EEG.event(nEvt).latency);
+    row = find([SW.Latency{:}]' == EEG.event(nEvt).latency);
     if ~isempty(row)
         iRow(end+1) = row;
     end
@@ -466,7 +418,7 @@ eeg_checkset(EEG);
 disp('Adding sleep stages to results table...')
 nEvt = 1;
 for nRow = 1:height(SW)
-    evtTemp = find([EEG.event(:).latency]' == SW.firstLatency{nRow});
+    evtTemp = find([EEG.event(:).latency]' == SW.Latency{nRow});
     evt(nEvt) = evtTemp(1);
     nEvt = nEvt + 1;
 end

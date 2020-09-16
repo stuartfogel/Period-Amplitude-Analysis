@@ -18,11 +18,13 @@ function vers = eegplugin_PAA(fig, trystrs, catchstrs)
 % labels
 % Sept 13, 2020  Revised 1.2 included sleep stages in output and SW events,
 % fixed bug for SW inclusion criteria, optimised code
+% Sept 16, 2020  Revised 1.3 negative slope calculation bug fixed. Improved
+% detection criteria to include any adjacent HWs
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
 
-vers = '1.2';
+vers = '1.3';
 if nargin < 3
     error('eegplugin_PAA requires 3 arguments');
 end
