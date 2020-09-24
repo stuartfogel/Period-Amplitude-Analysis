@@ -20,11 +20,13 @@ function vers = eegplugin_PAA(fig, trystrs, catchstrs)
 % fixed bug for SW inclusion criteria, optimised code
 % Sept 16, 2020  Revised 1.3 negative slope calculation bug fixed. Improved
 % detection criteria to include any adjacent HWs
+% Sept 24, 2020  Revised 1.4 major fix for starting issue with polarity and
+% table creation for multiple files.
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
 
-vers = '1.3';
+vers = '1.4';
 if nargin < 3
     error('eegplugin_PAA requires 3 arguments');
 end

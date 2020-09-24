@@ -16,25 +16,18 @@ function [EEG,com] = pop_PAA(EEG)
 % artifacted (with events in the EEG.event structure).
 %
 % Output results table variables:
+% 'N': file number
 % 'ID': filename
 % 'Channel': EEG channel (user-defined)
 % 'sleepStage': Sleep Stage that the first part of the half wave occurs in
-% 'firstLatency': latency of first half-wave in data points
-% 'posDur': positive half-wave period in sec
-% 'posFreq': positive half-wave ocsillatory frequency in Hz
-% 'posPeakAmp': positive half-wave peak amplitude in uV
-% 'posArea': positive half-wave area under the curve (i.e., integrated amplitude = sum of rectified values * 1/srate) in uV*sec
-% 'posAvgAmp': positive half-wave average amplitude (i.e., rectified amplitude = integrated amplitude/period) in uV
-% 'posUpSlope': positive half-wave upward slope in uV/sec
-% 'posDownSlope': positive half-wave downward slope in uV/sec
-% 'secondLatency': latency of second half-wave in data points
-% 'negDur': negative half-wave period in sec
-% 'negFreq': negative half-wave ocsillatory frequency in Hz
-% 'negPeakAmp': negative half-wave peak amplitude in uV
-% 'negArea': negative half-wave area under the curve (i.e., integrated amplitude = sum of rectified values * 1/srate) in uV*sec
-% 'negAvgAmp': negative half-wave average amplitude (i.e., rectified amplitude = integrated amplitude/period) in uV
-% 'negUpSlope': negative half-wave upward slope in uV/sec
-% 'negDownSlope': negative half-wave downward slope in uV/sec
+% 'Latency': latency of first half-wave in data points
+% 'Duration': positive half-wave period in sec
+% 'Frequency': positive half-wave ocsillatory frequency in Hz
+% 'PeakAmp': positive half-wave peak amplitude in uV
+% 'Area': positive half-wave area under the curve (i.e., integrated amplitude = sum of rectified values * 1/srate) in uV*sec
+% 'AvgAmp': positive half-wave average amplitude (i.e., rectified amplitude = integrated amplitude/period) in uV
+% 'UpSlope': positive half-wave upward slope in uV/sec
+% 'DownSlope': positive half-wave downward slope in uV/sec
 %
 % June 24, 2020  Version 1.0
 % Aug 27, 2020   Revised 1.1 Critical bug fixes: ch order, polarity, channel
@@ -43,6 +36,8 @@ function [EEG,com] = pop_PAA(EEG)
 % fixed bug for SW inclusion criteria, optimised code
 % Sept 16, 2020  Revised 1.3 negative slope calculation bug fixed. Improved
 % detection criteria to include any adjacent HWs
+% Sept 24, 2020  Revised 1.4 major fix for starting issue with polarity and
+% table creation for multiple files.
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %

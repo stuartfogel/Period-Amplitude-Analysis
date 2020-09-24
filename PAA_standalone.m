@@ -11,6 +11,7 @@ function [EEG] = PAA_standalone(EEG)
 % artifacted (with events in the EEG.event structure).
 %
 % Output results table variables:
+% 'N': file number
 % 'ID': filename
 % 'Channel': EEG channel (user-defined)
 % 'sleepStage': Sleep Stage that the first part of the half wave occurs in
@@ -45,16 +46,16 @@ function [EEG] = PAA_standalone(EEG)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% LOAD EEGLAB
-eeglab
+eeglab % make sure all eeglab functions are added to the path
 clear; close all; clc;
 
 %% USER-DEFINED PARAMETERS
 % specify channels - needs to match channel labels in dataset
 % ChOI = {'F3','Fz','F4'}; % default
-ChOI = {'F3-A2'}; % user-defined
+ChOI = {'Fz'}; % user-defined
 peaks = []; % mark event latencies at the HW peaks 1, or at the zero-crossings [] (default); note: marking peaks results in misalignment from results in output table
 eventName = {'SWpos','SWneg'}; % name of event. Default: {'SWpos','SWneg'}.
-allSleepStages = {'N1','N2','N3','REM','wake','unscored'}; % all sleep stages included in scoring. Default: 'N1 N2 N3 REM Wake'.
+allSleepStages = {'N1','N2','N3','R','Wake','unscored'}; % all sleep stages included in scoring. Default: 'N1 N2 N3 REM Wake'.
 badData = 'Movement'; % name for movement artifact. Default: 'Movement'.
 
 %% FILTER SETTING (default for slow wave detection 0.5-4Hz)
@@ -496,7 +497,6 @@ for nfile = 1:length(filename)
     
     %% find sleep stages for SW events and add to results table
     disp('Adding sleep stages to results table...')
-    
     Event = EEG.event;
     evtIdx = find(ismember({Event.type},eventName));
     evtLatency = {Event(evtIdx).latency}';
