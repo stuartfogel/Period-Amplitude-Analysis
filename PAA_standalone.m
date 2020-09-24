@@ -33,6 +33,7 @@ function [EEG] = PAA_standalone(EEG)
 % detection criteria to include any adjacent HWs
 % Sept 23, 2020 Revised 1.4 major fix for starting issue with polarity and
 % table creation for multiple files.
+% Sept 24, 2020 Revised 1.5 fixed conflict with identical latency events
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
@@ -452,6 +453,7 @@ for nfile = 1:length(filename)
         % sort table by latency
         SW = sortrows(SW,[1 5]);
         
+        clear upHWlatency downHWlatency HWlatency
         clear sleepStage segUpDetect segDownDetect segUp segDown idx_up idx_down
         clear upN downN upID downID upCH downCH upSleepStage downSleepStage N ID CH sleepStage HWlatency HWperiod HWfreq HWpeak HWintamp HWrecamp HWupslope HWdownslope HWpeakLat
         clear eventsUp eventsDown i n upEvt downEvt SWnew
@@ -482,9 +484,13 @@ for nfile = 1:length(filename)
     for nEvt=ToRmv
         row = find([SW.Latency{:}]' == EEG.event(nEvt).latency);
         if ~isempty(row)
-            iRow(end+1) = row;
+            for i=1:length(row) % in case there are events with identical latencies
+                iRow(end+1) = row(i);
+            end
         end
     end
+    iRow = unique(iRow); % to remove the repeat offenders
+    
     % remove the bad events from the results table
     SW(iRow,:) = [];
     

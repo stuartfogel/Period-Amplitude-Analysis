@@ -22,11 +22,12 @@ function vers = eegplugin_PAA(fig, trystrs, catchstrs)
 % detection criteria to include any adjacent HWs
 % Sept 24, 2020  Revised 1.4 major fix for starting issue with polarity and
 % table creation for multiple files.
+% Sept 24, 2020 Revised 1.5 fixed conflict with identical latency events
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
 
-vers = '1.4';
+vers = '1.5';
 if nargin < 3
     error('eegplugin_PAA requires 3 arguments');
 end
