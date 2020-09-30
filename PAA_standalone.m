@@ -26,14 +26,16 @@ function [EEG] = PAA_standalone(EEG)
 %
 % June 24, 2020 Version 1.0
 % Aug  27, 2020 Revised 1.1 Critical bug fixes: ch order, polarity, channel
-% labels
+%   labels
 % Sept 13, 2020 Revised 1.2 included sleep stages in output and SW events,
-% fixed bug for SW inclusion criteria, optimised code
+%   fixed bug for SW inclusion criteria, optimised code
 % Sept 16, 2020 Revised 1.3 negative slope calculation bug fixed. Improved
-% detection criteria to include any adjacent HWs
+%   detection criteria to include any adjacent HWs
 % Sept 23, 2020 Revised 1.4 major fix for starting issue with polarity and
-% table creation for multiple files.
+%   table creation for multiple files.
 % Sept 24, 2020 Revised 1.5 fixed conflict with identical latency events
+% Sept 28, 2020 Revised 1.6 adjusted filtering parameters and functions to
+%   improve filter response - AG
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
@@ -64,17 +66,17 @@ badData = 'Movement'; % name for movement artifact. Default: 'Movement'.
 % bandpass filter signal (filters with zero or linear phase-shifts needed to avoid signal distortions)
 % e.g., frequency range of interest from 0.5 to 4 Hz
 % band-pass filtered:
-% sixth-order Chebyshev type II low-pass filter, -10 dB at 4.6 Hz (note: increased from 3 to 10 dB attenuation)
-% third-order Chebyshev type II high-pass filter; -10 dB at 0.4 Hz (note: increased from 3 to 10 dB attenuation)
-% The filters were applied in the forward and reverse directions, in order to achieve zero-phase distortion resulting in doubling of the filter order.
+% 32nd-order Chebyshev type II low-pass filter, -80 dB stopband attenuation (note: increased from 10 to 80 dB attenuation)
+% 64th-order Chebyshev type II high-pass filter; -80 dB stopband attenuation (note: increased from 10 to 80 dB attenuation)
+% The filters were applied in the forward and reverse directions, to achieve zero-phase distortion resulting in doubling of the filter order.
 % The cut-off frequencies were selected to achieve minimal attenuation in the band of interest (0.5-4 Hz) and good attenuation at neighbouring frequencies, i.e. below 0.5 and above 4 Hz
 % Adapted from doi: https://doi.org/10.1111/j.1365-2869.2009.00775.x
-LPorder = 6;
-LPfreq = 2.3; % use 2.3 for target of 2 Hz, or 4.6 for target of 4Hz
-LPattenuation = 10;
-HPorder = 3;
-HPfreq = 0.4;
-HPattenuation = 10;
+LPorder  = 32;   % lowpass filter order
+LPfreq   = 2.15; % use 2.15 for target of 2 Hz, or 4.3 for target of 4Hz
+HPorder  = 64;   % highpass filter order
+HPfreq   = 0.46; % highpass filter cutoff
+filtAttn = 80;   % stopband attenuation (dB)
+
 targetLPfreq = 2; % target lowpass frequency: use 2 for target of 2 Hz, or use 4 for target of 4Hz
 % use fvtool(lp,hp) after building filters below to visualize
 
@@ -143,9 +145,11 @@ for nfile = 1:length(filename)
     %% filter the EEG channels of interest
     disp('Filtering the data...')
     
-    % build the filter
-    lp = designfilt('lowpassiir', 'FilterOrder', LPorder, 'StopbandFrequency', LPfreq, 'StopbandAttenuation', LPattenuation, 'SampleRate', EEG.srate);
-    hp = designfilt('highpassiir', 'FilterOrder', HPorder, 'StopbandFrequency', HPfreq, 'StopbandAttenuation', HPattenuation, 'SampleRate', EEG.srate);
+%     % build the filter (old method)
+%     lp = designfilt('lowpassiir', 'FilterOrder', LPorder, 'StopbandFrequency', LPfreq, 'StopbandAttenuation', filtAttn, 'SampleRate', EEG.srate);
+%     hp = designfilt('highpassiir', 'FilterOrder', HPorder, 'StopbandFrequency', HPfreq, 'StopbandAttenuation', filtAttn, 'SampleRate', EEG.srate);
+    lp = design(fdesign.lowpass('N,Fst,Ast', LPorder, LPfreq, filtAttn, EEG.srate), 'cheby2');
+    hp = design(fdesign.highpass('N,Fst,Ast', HPorder, HPfreq, filtAttn, EEG.srate), 'cheby2');
     % fvtool(lp,hp) % use to visualize filters
     
     % filter the data
