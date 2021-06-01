@@ -41,6 +41,21 @@ function [EEG,com] = pop_PAA(EEG)
 % Sept 24, 2020 Revised 1.5 fixed conflict with identical latency events
 % Sept 28, 2020 Revised 1.6 adjusted filtering parameters and functions to
 %   improve filter response - AG
+% Jun 1, 2021 Revised 1.7 (incorporated updates from AG): 
+%   1. updates to HW threshold process. The peak-to-peak amplitude is now 
+%   calculated by finding the difference between the maximum absolute peak 
+%   of each HW and it's oppositely valanced HW neighbours. As before, the 
+%   length of each HW and it's neighbour is also checked to ensure it falls
+%   within the correct frequency range. Only HWs that meet both criteria 
+%   are included in future analyses. 
+%   2. added feature to save each subjects data as separate .csv files in 
+%   addition to concatinated .csv for all subjects 
+%   3. minor fix to correct mismatch between filename and setname in output 
+%   table - SF
+%   4. added half wave amplitude threshold in addition to p2p amplitude 
+%   threshold. - AG
+%   5. added functionality to remove unwanted SW during sleepstages of 
+%   non-interest - SF
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
@@ -62,8 +77,8 @@ end
 
 % GUI geometry setup
 g = [3, 2];
-geometry = {1,g,g,1,[2 2 1]};
-geomvert = [1 1 1 1 1];
+geometry = {1,g,g,g,1,[2 2 1]};
+geomvert = [1 1 1 1 1 1];
 
 % select channels
 cb_chan = 'pop_chansel(get(gcbf, ''userdata''), ''field'', ''labels'', ''handle'', findobj(''parent'', gcbf, ''tag'', ''ChOI''));';
@@ -72,8 +87,10 @@ cb_chan = 'pop_chansel(get(gcbf, ''userdata''), ''field'', ''labels'', ''handle'
 uilist = { ...
     ... label settings
     {'style', 'text', 'string', 'PAA for slow wave (0.5-2Hz, >75uV) detection'} ...
-    {'style', 'text', 'string', 'Label for sleep stages'} ...
+    {'style', 'text', 'string', 'Label for all sleep stages'} ...
     {'style', 'edit', 'string', 'N1 N2 N3 REM Wake' 'tag' 'allSleepStages'} ...
+    {'style', 'text', 'string', 'Label for sleep stages to exclude SW'} ...
+    {'style', 'edit', 'string', 'N1 REM Wake' 'tag' 'badSleepstages'} ...
     {'style', 'text', 'string', 'Label for bad data'} ...
     {'style', 'edit', 'string', 'Movement' 'tag' 'badData'} ...
     ... channel options
@@ -101,15 +118,16 @@ result = inputgui('geometry', geometry, 'geomvert', geomvert, 'uilist', uilist, 
 % launch PAA
 if ~isempty(result)
     allSleepStages = result{1};
-    badData = result{2};
-    ChOI = result{3};
+    badSleepstages = result{2};
+    badData = result{3};
+    ChOI = result{4};
     % launch pipeline
-    [EEG] = PAA(EEG,ChOI,badData,allSleepStages);
+    [EEG] = PAA(EEG,ChOI,badData,allSleepStages,badSleepstages);
 else
     com = '';
     return
 end
 
-com = sprintf('EEG = PAA(%s,%s,%s,%s);',inputname(1),ChOI,badData,allSleepStages);
+com = sprintf('EEG = PAA(%s,%s,%s,%s,%s);',inputname(1),ChOI,badData,allSleepStages,badSleepstages);
 
 end

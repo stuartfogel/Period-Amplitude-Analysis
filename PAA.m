@@ -1,4 +1,4 @@
-function [EEG] = PAA(EEG,ChOI,badData,allSleepStages)
+function [EEG] = PAA(EEG,ChOI,badData,allSleepStages,badSleepstages)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -10,6 +10,7 @@ function [EEG] = PAA(EEG,ChOI,badData,allSleepStages)
 % ChOI = list of channel labels to run PAA, e.g., {'F3','Fz','F4'}
 % badData = label for bad data event type, e.g., 'Movement'
 % allSleepStages = all sleep stages included in scoring, e.g., {'N1','N2','N3','R','W'}
+% badSleepstages = sleep stages excluded from SW detection, e.g., {'N1','R','W'}
 %
 % Requires:
 % eeglab *.set file, ideally already sleep stage scored and movement
@@ -30,17 +31,32 @@ function [EEG] = PAA(EEG,ChOI,badData,allSleepStages)
 % 'DownSlope': positive half-wave downward slope in uV/sec
 %
 % June 24, 2020 Version 1.0
-% Aug  27, 2020 Revised 1.1 Critical bug fixes: ch order, polarity, channel
+% Aug  27, 2020 Revised 1.1: Critical bug fixes: ch order, polarity, channel
 %   labels
-% Sept 13, 2020 Revised 1.2 included sleep stages in output and SW events,
+% Sept 13, 2020 Revised 1.2: included sleep stages in output and SW events,
 %   fixed bug for SW inclusion criteria, optimised code
-% Sept 16, 2020 Revised 1.3 negative slope calculation bug fixed. Improved
+% Sept 16, 2020 Revised 1.3: negative slope calculation bug fixed. Improved
 %   detection criteria to include any adjacent HWs
-% Sept 23, 2020 Revised 1.4 major fix for starting issue with polarity and
+% Sept 23, 2020 Revised 1.4: major fix for starting issue with polarity and
 %   table creation for multiple files.
-% Sept 24, 2020 Revised 1.5 fixed conflict with identical latency events
-% Sept 28, 2020 Revised 1.6 adjusted filtering parameters and functions to
+% Sept 24, 2020 Revised 1.5: fixed conflict with identical latency events
+% Sept 28, 2020 Revised 1.6: adjusted filtering parameters and functions to
 %   improve filter response - AG
+% Jun 1, 2021 Revised 1.7 (incorporated updates from AG):
+%   1. updates to HW threshold process. The peak-to-peak amplitude is now
+%   calculated by finding the difference between the maximum absolute peak
+%   of each HW and it's oppositely valanced HW neighbours. As before, the
+%   length of each HW and it's neighbour is also checked to ensure it falls
+%   within the correct frequency range. Only HWs that meet both criteria
+%   are included in future analyses.
+%   2. added feature to save each subjects data as separate .csv files in
+%   addition to concatinated .csv for all subjects
+%   3. minor fix to correct mismatch between filename and setname in output
+%   table - SF
+%   4. added half wave amplitude threshold in addition to p2p amplitude
+%   threshold. - AG
+%   5. added functionality to remove unwanted SW during sleepstages of
+%   non-interest - SF
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
@@ -58,6 +74,7 @@ if nargin < 1; EEG = eeg_emptyset(); end
 if nargin < 2; ChOI = 'F3 Fz F4'; end % default
 if nargin < 3; badData = 'Movement'; end % name for movement artifact. Default: 'Movement'.
 if nargin < 4; allSleepStages = 'N1 N2 N3 REM Wake'; end % name for sleep stages included in scoring. Default: 'N1 N2 N3 REM Wake'.
+if nargin < 5; badSleepstages = 'N1 REM Wake'; end % sleep stages excluded from SW detection, Default: 'N1 REM Wake'.
 
 %% OPTIONAL PARAMETERS
 eventName = {'SWpos','SWneg'}; % name of event. Default: {'SWpos','SWneg'}.
@@ -119,20 +136,18 @@ clear n nChOI chIdx
 %% filter the EEG channels of interest
 disp('Filtering the data...')
 
-% build the filter
-% lp = designfilt('lowpassiir', 'FilterOrder', LPorder, 'StopbandFrequency', LPfreq, 'StopbandAttenuation', LPattenuation, 'SampleRate', EEG.srate);
-% hp = designfilt('highpassiir', 'FilterOrder', HPorder, 'StopbandFrequency', HPfreq, 'StopbandAttenuation', HPattenuation, 'SampleRate', EEG.srate);
+% build filters
 lp = design(fdesign.lowpass('N,Fst,Ast', LPorder, LPfreq, filtAttn, EEG.srate), 'cheby2');
 hp = design(fdesign.highpass('N,Fst,Ast', HPorder, HPfreq, filtAttn, EEG.srate), 'cheby2');
 
 % fvtool(lp,hp) % use to visualize filters
 
 % filter the data
-datafilt = zeros(size(data));
+datafilt = zeros(size(data)); % create array for filtered data
 for n=1:size(data,1)
-    filtCh = filtfilt(lp,data(n,:));
-    filtCh = filtfilt(hp,filtCh);
-    datafilt(n,:) = filtCh(1,:);
+    filtCh = filtfilt(lp.sosMatrix,lp.ScaleValues, data(n,:)); % low-pass filter
+    filtCh = filtfilt(hp.sosMatrix, hp.ScaleValues, filtCh); % high-pass filter
+    datafilt(n,:) = filtCh(1,:); % add filtered data to array
 end
 clear hp lp filtCh n data
 
@@ -146,7 +161,7 @@ for nch=1:size(datafilt,1)
     xdiff = diff(sign(datafilt(nch,:)));
     idx_up = find(xdiff>0);
     idx_down = find(xdiff<0);
-    startDelay = min([idx_up(1),idx_down(1)]); % find the delay/onset of the first HW
+    startDelay = min([idx_up(1),idx_down(1)]); % find the delay/onset of the first half wave (HW)
     clear xdiff
     
     % segment data into half waves
@@ -160,6 +175,7 @@ for nch=1:size(datafilt,1)
             segUp{n} = datafilt(nch,idx_up(n)+1:idx_down(n+1));
         end
     end
+    clear n
     
     % verify that polarity of HWs are correct
     if sign(segUp{1}(1)) ~= 1 && sign(segDown{1}(1)) ~= -1
@@ -172,28 +188,62 @@ for nch=1:size(datafilt,1)
     % identify and count HWs > peak amplitude threshold & longer than high freq cut-off
     % e.g., slow waves: 75 uV peak-to-peak, 37.5 uV for positive or negative half-waves
     % e.g., > 0.125 sec (re; impossible to have a SW <4Hz happen in that time)
-    segUpDetect = false(1,length(segUp));
-    for n=1:length(segUp)
-        if n == length(segUp) % catch exceed end of array
-            break
-        end
-        if idx_up(1) < idx_down(1) % which one is first?
-            segUpDetect(n) = logical((max(abs(segUp{n}))>37.5 && length(segUp{n})>1/targetLPfreq*EEG.srate/2) && ((max(abs(segDown{n}))>37.5 && length(segDown{n})>1/targetLPfreq*EEG.srate/2) || (max(abs(segDown{n-1}))>37.5 && length(segDown{n-1})>1/targetLPfreq*EEG.srate/2)));
-        else
-            segUpDetect(n) = logical((max(abs(segUp{n}))>37.5 && length(segUp{n})>1/targetLPfreq*EEG.srate/2) && ((max(abs(segDown{n}))>37.5 && length(segDown{n})>1/targetLPfreq*EEG.srate/2) || (max(abs(segDown{n+1}))>37.5 && length(segDown{n+1})>1/targetLPfreq*EEG.srate/2)));
-        end
+    p2pMin = 75;
+    HWmin  = 37.5;
+    minLen = EEG.srate/(targetLPfreq.*2);  % minimum length of HW in samples
+    
+    % % % detect up segments
+    upPeak = cellfun(@(p) max(abs(p)), segUp); % find abs max amplitude of up segments
+    upLen  = cellfun(@length, segUp);   % length of up segments in samples
+    
+    dnPeak = cellfun(@(n) max(abs(n)), segDown); % find abs max amplitude of down segments
+    dnLen  = cellfun(@length, segDown); % length of down segments in samples
+    
+    if idx_up(1) < idx_down(1)  % if first HW is postitive
+        dnPeak = [nan, dnPeak(1:end-1); dnPeak];    % make array of peaks for negative HW before and after postitive wave
+        dnLen  = [nan, dnLen(1:end-1); dnLen];      % make array of segment lengths for neg HW before and after positive HW
+    else                        % if first HW is negative
+        dnPeak = [dnPeak; dnPeak(2:end), nan];    % make array of peaks for negative HW before and after postitive wave
+        dnLen  = [dnLen; dnLen(2:end), nan];      % make array of segment lengths for neg HW before and after positive HW
     end
-    segDownDetect = false(1,length(segDown));
-    for n=1:length(segDown)
-        if n == length(segDown) % catch exceed end of array
-            break
-        end
-        if idx_up(1) < idx_down(1) % which one is first?
-            segDownDetect(n) = logical((max(abs(segDown{n}))>37.5 && length(segDown{n})>1/targetLPfreq*EEG.srate/2) && ((max(abs(segUp{n}))>37.5 && length(segUp{n})>1/targetLPfreq*EEG.srate/2) || (max(abs(segUp{n+1}))>37.5 && length(segUp{n+1})>1/targetLPfreq*EEG.srate/2)));
-        else
-            segDownDetect(n) = logical((max(abs(segDown{n}))>37.5 && length(segDown{n})>1/targetLPfreq*EEG.srate/2) && ((max(abs(segUp{n}))>37.5 && length(segUp{n})>1/targetLPfreq*EEG.srate/2) || (max(abs(segUp{n-1}))>37.5 && length(segUp{n-1})>1/targetLPfreq*EEG.srate/2)));
-        end
+    
+    % identify positive HWs by amplitude
+    HWamp  = sum([upPeak; max(dnPeak, [], 1)], 1) >= p2pMin & ... % add max abs amplitude of up segment to max abs amplitude of neighbouring down segs to determine p2p range
+        all([upPeak; max(dnPeak, [], 1)] >= HWmin, 1);            % check that each HW segment is exceeds HW amplitude threshold
+    
+    % identify positive HWs by length
+    HW_idx = dnPeak == repmat(max(dnPeak, [], 1), size(dnPeak, 1), 1); % index of down segments used in peak-to-peak calculation
+    HWlen  = upLen >= minLen & dnLen(HW_idx)' >= minLen;
+    
+    segUpDetect = HWamp & HWlen; % index of positive HWs that meet both amplitude and length thresholds
+    clear upPeak upLen dnPeak dnLen HWamp HW_idx HWlen % clear variables so they don't interfere with next section
+    
+    % % % detect down segments
+    dnPeak = cellfun(@(n) max(abs(n)), segDown);
+    dnLen  = cellfun(@length, segDown);
+    
+    upPeak = cellfun(@(p) max(abs(p)), segUp);
+    upLen  = cellfun(@length, segUp);
+    
+    if idx_down(1) < idx_up(1)  % if first HW is negative
+        upPeak = [nan, upPeak(1:end-1); upPeak];    % make array of peaks for pos HW before and after neg HW
+        upLen  = [nan, upLen(1:end-1); upLen];      % make array of segment lengths for pos HW before and after neg HW
+    else                        % if first HW is positive
+        upPeak = [upPeak; upPeak(2:end), nan];    % make array of peaks for pos HW before and after neg wave
+        upLen  = [upLen; upLen(2:end), nan];      % make array of segment lengths for pos HW before and after neg HW
     end
+    
+    % identify negative HWs by amplitude
+    HWamp  = sum([dnPeak; max(upPeak, [], 1)], 1) >= p2pMin & ... % add max abs amplitude of neg HW to max abs amplitude of neighbouring up segs to determine p2p range
+        all([dnPeak; max(upPeak, [], 1)] >= HWmin, 1);           % check that each HW segment is exceeds HW amplitude threshold
+    
+    % identify negative HWs by length
+    HW_idx = upPeak == repmat(max(upPeak, [], 1), size(upPeak, 1), 1);
+    HWlen  = dnLen >= minLen & upLen(HW_idx)' >= minLen;
+    
+    % save index of negative HWs that meet amplitude and length thresholds
+    segDownDetect = HWamp & HWlen;
+    clear upPeak upLen dnPeak dnLen HWamp HW_idx HWlen % clear variables
     
     % compute HW period, frequency, peak amplitude, peak, integrated (i.e., area under curve: sum of rectified values * 1/srate),
     % rectified amplitude (i.e., avg amplitude: integrated amplitude/HW period) and up (crossing to peak) and down (peak to crossing) slope
@@ -250,7 +300,7 @@ for nch=1:size(datafilt,1)
     HWpeak = [upHWpeak, downHWpeak];
     HWintamp = [upHWintamp, downHWintamp];
     HWrecamp = [upHWrecamp, downHWrecamp];
-    HWpeakLat = [upHWpeakLat, downHWpeakLat];
+%         HWpeakLat = [upHWpeakLat, downHWpeakLat]; % unused; HWLatency created and used from same variables later
     HWupslope = [upHWupslope, downHWupslope];
     HWdownslope = [upHWdownslope, downHWdownslope];
     
@@ -381,7 +431,7 @@ for nch=1:size(datafilt,1)
         end
     end
     EEG.event = Event;
-    clear evtIdx
+    clear evtIdx iEvt
     
     %% populate table with results
     disp('Creating results table...')
@@ -440,21 +490,33 @@ for nch=1:size(datafilt,1)
     
 end
 
-%% mark for delete SW during movement artifact
+%% mark for delete SW during movement artifact and outside NREM
 disp('Deleting false positives...')
 Event = EEG.event;
 evtIdx = find(ismember({Event.type},eventName));
-ToRmv = [];
+ToRmvArt = [];
+ToRmvSS = [];
+badSleepstages = strsplit(badSleepstages,' ');  % needed to parse input from eeglab GUI
 
 for iEvt = evtIdx % loop on event
     bad = find(ismember({Event(1:iEvt).type},badData),1,'last');
     if ~isempty(bad)
         if Event(bad).latency + Event(bad).duration > Event(iEvt).latency
-            ToRmv(end+1) = iEvt;
+            ToRmvArt(end+1) = iEvt;
+        end
+    end
+end
+for iEvt = evtIdx % loop on event
+    bad = find(ismember({Event(1:iEvt).type},badSleepstages),1,'last');
+    if ~isempty(bad)
+        if Event(bad).latency + Event(bad).duration > Event(iEvt).latency
+            ToRmvSS(end+1) = iEvt;
         end
     end
 end
 clear bad Event evtIdx
+ToRmv = [ToRmvArt ToRmvSS];
+ToRmv = sort(ToRmv);
 
 % remove NaN values from the results table
 SW=SW(~any(ismissing(SW,NaN),2),:);
@@ -481,6 +543,8 @@ EEG.event(ToRmv) = []; % delete
 EEG = eeg_checkset(EEG, 'eventconsistency');
 eeg_checkset(EEG);
 
+clear ToRmv ToRmvArt ToRmvSS
+
 %% find sleep stages for SW events and add to results table
 disp('Adding sleep stages to results table...')
 Event = EEG.event;
@@ -489,7 +553,7 @@ evtLatency = {Event(evtIdx).latency}';
 evtStage = {Event(evtIdx).SleepStage}';
 nevt = 1;
 for nRow = height(SW)-length(evtIdx)+1:height(SW)
-    if contains(filename{nfile},char(table2cell(SW(nRow,2)))) && SW.Latency{nRow} == evtLatency{nevt}
+    if contains(EEG.setname,char(table2cell(SW(nRow,2)))) && SW.Latency{nRow} == evtLatency{nevt}
         stage(nevt) = evtStage(nevt);
         nevt = nevt + 1;
     else
@@ -498,14 +562,15 @@ for nRow = height(SW)-length(evtIdx)+1:height(SW)
 end
 SW(height(SW)-length(stage)+1:end,4) = stage'; % this is a little tricky, but it should do the job
 clear Event evtIdx evtLatency evtStage stage
-    
+
 %% SELECT OUTPUT DIRECTORY
 disp('Please select a directory in which to save the results.');
 resultDir = uigetdir('', 'Select the directory in which to save the results');
 
-%% save out the results
-writetable(SW,[resultDir filesep 'SWevents.csv'],'Delimiter',',');
-save([resultDir filesep 'SWevents.mat'], 'SW');
-clear SW SWnew startDelay nch datafilt ToRmv Event
+%% save out "single subject" table
+subidx = cell2mat(cellfun(@(n) strcmpi(n, EEG.setname), SW.ID, 'UniformOutput', 0)); % logical index of current subj's data
+SWsub = SW(subidx,:);     
+writetable(SWsub, [resultDir filesep EEG.setname '_SWevents.csv'], 'Delimiter', ',');
+clear SW SWsub subidx SWnew startDelay nch datafilt ToRmv Event
 
 end

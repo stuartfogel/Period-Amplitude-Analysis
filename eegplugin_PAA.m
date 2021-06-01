@@ -25,11 +25,26 @@ function vers = eegplugin_PAA(fig, trystrs, catchstrs)
 % Sept 24, 2020 Revised 1.5 fixed conflict with identical latency events
 % Sept 28, 2020 Revised 1.6 adjusted filtering parameters and functions to
 %   improve filter response - AG
+% Jun 1, 2021 Revised 1.7 (incorporated updates from AG): 
+%   1. updates to HW threshold process. The peak-to-peak amplitude is now 
+%   calculated by finding the difference between the maximum absolute peak 
+%   of each HW and it's oppositely valanced HW neighbours. As before, the 
+%   length of each HW and it's neighbour is also checked to ensure it falls
+%   within the correct frequency range. Only HWs that meet both criteria 
+%   are included in future analyses. 
+%   2. added feature to save each subjects data as separate .csv files in 
+%   addition to concatinated .csv for all subjects 
+%   3. minor fix to correct mismatch between filename and setname in output 
+%   table - SF
+%   4. added half wave amplitude threshold in addition to p2p amplitude 
+%   threshold. - AG
+%   5. added functionality to remove unwanted SW during sleepstages of 
+%   non-interest - SF
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
 
-vers = '1.6';
+vers = '1.7';
 if nargin < 3
     error('eegplugin_PAA requires 3 arguments');
 end
