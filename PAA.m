@@ -1,4 +1,4 @@
-function [EEG] = PAA(EEG,ChOI,badData,allSleepStages,badSleepstages)
+function [EEG] = PAA(EEG,ChOI,badData,allSleepStages,badSleepstages,lightsTags)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -57,6 +57,8 @@ function [EEG] = PAA(EEG,ChOI,badData,allSleepStages,badSleepstages)
 %   threshold. - AG
 %   5. added functionality to remove unwanted SW during sleepstages of
 %   non-interest - SF
+% Jun 21, 2021 Revised 1.8: added feature to remove SW events outside
+%   Lights OFF/ON tags.
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
@@ -75,6 +77,7 @@ if nargin < 2; ChOI = 'F3 Fz F4'; end % default
 if nargin < 3; badData = 'Movement'; end % name for movement artifact. Default: 'Movement'.
 if nargin < 4; allSleepStages = 'N1 N2 N3 REM Wake'; end % name for sleep stages included in scoring. Default: 'N1 N2 N3 REM Wake'.
 if nargin < 5; badSleepstages = 'N1 REM Wake'; end % sleep stages excluded from SW detection, Default: 'N1 REM Wake'.
+if nargin < 6; lightsTags = 'Lights Off, Lights On'; end % tags for lights on and lights off. used to remove false detections outside lights off interval. Default (comma separated): 'Lights Off, Lights On'.
 
 %% OPTIONAL PARAMETERS
 eventName = {'SWpos','SWneg'}; % name of event. Default: {'SWpos','SWneg'}.
@@ -494,9 +497,14 @@ end
 disp('Deleting false positives...')
 Event = EEG.event;
 evtIdx = find(ismember({Event.type},eventName));
+badEvt = [];
 ToRmvArt = [];
 ToRmvSS = [];
+ToRmvLightsOff = [];
+ToRmvLightsOn = [];
+tagFoundFlag = 0;
 badSleepstages = strsplit(badSleepstages,' ');  % needed to parse input from eeglab GUI
+lightsTags = strsplit(lightsTags,', ');  % needed to parse input from eeglab GUI
 
 for iEvt = evtIdx % loop on event
     bad = find(ismember({Event(1:iEvt).type},badData),1,'last');
@@ -514,8 +522,22 @@ for iEvt = evtIdx % loop on event
         end
     end
 end
-clear bad Event evtIdx
-ToRmv = [ToRmvArt ToRmvSS];
+for iEvt = evtIdx % loop on event
+    bad = find(ismember({Event(1:iEvt).type},lightsTags),1,'last');
+    badEvt(end+1) = iEvt;
+    if ~isempty(bad)
+        if strcmp(Event(bad).type, lightsTags{1}) && tagFoundFlag == 0 % lights off
+            ToRmvLightsOff = badEvt; % to remove from first SW event up until lights off tag
+            tagFoundFlag = 1;
+        elseif strcmp(Event(bad).type, lightsTags{2}) % lights on
+            if Event(iEvt).latency > Event(bad).latency
+                ToRmvLightsOn(end+1) = iEvt; % to remove SW events after lights on tag
+            end
+        end
+    end
+end
+clear tagFoundFlag bad badEvt Event evtIdx iEvt
+ToRmv = [ToRmvArt ToRmvSS ToRmvLightsOff ToRmvLightsOn];
 ToRmv = sort(ToRmv);
 
 % remove NaN values from the results table
@@ -543,7 +565,7 @@ EEG.event(ToRmv) = []; % delete
 EEG = eeg_checkset(EEG, 'eventconsistency');
 eeg_checkset(EEG);
 
-clear ToRmv ToRmvArt ToRmvSS
+clear ToRmv ToRmvArt ToRmvSS ToRmvLightsOff ToRmvLightsOn
 
 %% find sleep stages for SW events and add to results table
 disp('Adding sleep stages to results table...')

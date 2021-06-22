@@ -40,11 +40,13 @@ function vers = eegplugin_PAA(fig, trystrs, catchstrs)
 %   threshold. - AG
 %   5. added functionality to remove unwanted SW during sleepstages of 
 %   non-interest - SF
+% Jun 21, 2021 Revised 1.8: added feature to remove SW events outside
+%   Lights OFF/ON tags.
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
 
-vers = '1.7';
+vers = '1.8';
 if nargin < 3
     error('eegplugin_PAA requires 3 arguments');
 end

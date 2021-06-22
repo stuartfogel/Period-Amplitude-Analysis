@@ -56,6 +56,8 @@ function [EEG,com] = pop_PAA(EEG)
 %   threshold. - AG
 %   5. added functionality to remove unwanted SW during sleepstages of 
 %   non-interest - SF
+% Jun 21, 2021 Revised 1.8: added feature to remove SW events outside
+%   Lights OFF/ON tags.
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
@@ -77,8 +79,8 @@ end
 
 % GUI geometry setup
 g = [3, 2];
-geometry = {1,g,g,g,1,[2 2 1]};
-geomvert = [1 1 1 1 1 1];
+geometry = {1,g,g,g,g,1,[2 2 1]};
+geomvert = [1 1 1 1 1 1 1];
 
 % select channels
 cb_chan = 'pop_chansel(get(gcbf, ''userdata''), ''field'', ''labels'', ''handle'', findobj(''parent'', gcbf, ''tag'', ''ChOI''));';
@@ -93,6 +95,8 @@ uilist = { ...
     {'style', 'edit', 'string', 'N1 REM Wake' 'tag' 'badSleepstages'} ...
     {'style', 'text', 'string', 'Label for bad data'} ...
     {'style', 'edit', 'string', 'Movement' 'tag' 'badData'} ...
+    {'style', 'text', 'string', 'Labels for lights ON/OFF tags (comma separated)'} ...
+    {'style', 'edit', 'string', 'Lights Off, Lights On' 'tag' 'lightsTags'} ...
     ... channel options
     { 'style' 'text'       'string' '' } ...
     { 'style' 'text'       'string' 'Channel labels or indices' } ...
@@ -118,16 +122,17 @@ result = inputgui('geometry', geometry, 'geomvert', geomvert, 'uilist', uilist, 
 % launch PAA
 if ~isempty(result)
     allSleepStages = result{1};
-    badSleepstages = result{2};
+    badSleepstages = result{2};    
     badData = result{3};
-    ChOI = result{4};
+    lightsTags = result{4};
+    ChOI = result{5};
     % launch pipeline
-    [EEG] = PAA(EEG,ChOI,badData,allSleepStages,badSleepstages);
+    [EEG] = PAA(EEG,ChOI,badData,allSleepStages,badSleepstages,lightsTags);
 else
     com = '';
     return
 end
 
-com = sprintf('EEG = PAA(%s,%s,%s,%s,%s);',inputname(1),ChOI,badData,allSleepStages,badSleepstages);
+com = sprintf('EEG = PAA(%s,%s,%s,%s,%s,%s);',inputname(1),ChOI,badData,allSleepStages,badSleepstages,lightsTags);
 
 end
