@@ -58,6 +58,8 @@ function [EEG,com] = pop_PAA(EEG)
 %   non-interest - SF
 % Jun 21, 2021 Revised 1.8: added feature to remove SW events outside
 %   Lights OFF/ON tags.
+% May 26, 2022 Revised 1.9: corrected bug in calculation on integrated
+%   amplitude - SF
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %

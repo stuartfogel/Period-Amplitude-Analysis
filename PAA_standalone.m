@@ -53,6 +53,8 @@ function [EEG] = PAA_standalone(EEG)
 %   non-interest - SF
 % Jun 21, 2021 Revised 1.8: added feature to remove SW events outside
 %   Lights OFF/ON tags.
+% May 26, 2022 Revised 1.9: corrected bug in calculation on integrated
+%   amplitude - SF
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
@@ -289,7 +291,7 @@ for nfile = 1:length(filename)
                 upHWperiod(n) = length(segUp{n})/EEG.srate; % compute HW period
                 upHWfreq(n) = 1/upHWperiod(n); % compute frequency of HW (1/period)
                 upHWpeak(n) = max(segUp{n}); % compute peak amplitude
-                upHWintamp(n) = abs(sum(segUp{n}))*1/EEG.srate; % compute integrated amplitude
+                upHWintamp(n) = sum(abs(segUp{n}))*1/EEG.srate; % compute integrated amplitude
                 upHWrecamp(n) = upHWintamp(n)/upHWperiod(n); % compute rectified amplitude
                 upHWpeakLat(n) = find(segUp{n} == max(segUp{n})); % compute peak latency
                 upHWupslope(n) = upHWpeak(n)/(upHWpeakLat(n)/EEG.srate*1000); % compute upward slope in uV/ms
@@ -311,7 +313,7 @@ for nfile = 1:length(filename)
                 downHWperiod(n) = length(segDown{n})/EEG.srate; % compute HW period
                 downHWfreq(n) = 1/downHWperiod(n); % compute frequency of HW (1/period)
                 downHWpeak(n) = min(segDown{n}); % compute peak amplitude
-                downHWintamp(n) = abs(sum(segDown{n}))*1/EEG.srate; % compute integrated amplitude
+                downHWintamp(n) = sum(abs(segDown{n}))*1/EEG.srate; % compute integrated amplitude
                 downHWrecamp(n) = downHWintamp(n)/downHWperiod(n); % compute rectified amplitude
                 downHWpeakLat(n) = find(segDown{n} == min(segDown{n})); % compute peak latency
                 downHWupslope(n) = (downHWpeak(n)/(downHWpeakLat(n)/EEG.srate*1000))*-1; % compute upward slope in uV/ms

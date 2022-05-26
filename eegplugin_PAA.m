@@ -42,11 +42,13 @@ function vers = eegplugin_PAA(fig, trystrs, catchstrs)
 %   non-interest - SF
 % Jun 21, 2021 Revised 1.8: added feature to remove SW events outside
 %   Lights OFF/ON tags.
+% May 26, 2022 Revised 1.9: corrected bug in calculation on integrated
+%   amplitude - SF
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
 
-vers = '1.8';
+vers = '1.9';
 if nargin < 3
     error('eegplugin_PAA requires 3 arguments');
 end
