@@ -2,64 +2,8 @@ function [EEG,com] = pop_PAA(EEG)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% This function performs Period Amplitude Analysis (PAA) on EEGlab data to
-% detect and measure slow waves. The events are marked on the EEG, saved
-% as a new dataset and a results *.csv and *.mat tables are created.
-%
-% Input:
-% ChOI = list of channel labels to run PAA, e.g., {'F3','Fz','F4'}
-% badData = label for bad data event type, e.g., 'Movement'
-% allSleepStages = all sleep stages included in scoring, e.g., {'N1','N2','N3','R','W'}
-%
-% Requires:
-% eeglab *.set file, ideally already sleep stage scored and movement
-% artifacted (with events in the EEG.event structure).
-%
-% Output results table variables:
-% 'N': file number
-% 'ID': filename
-% 'Channel': EEG channel (user-defined)
-% 'sleepStage': Sleep Stage that the first part of the half wave occurs in
-% 'Latency': latency of first half-wave in data points
-% 'Duration': positive half-wave period in sec
-% 'Frequency': positive half-wave ocsillatory frequency in Hz
-% 'PeakAmp': positive half-wave peak amplitude in uV
-% 'Area': positive half-wave area under the curve (i.e., integrated amplitude = sum of rectified values * 1/srate) in uV*sec
-% 'AvgAmp': positive half-wave average amplitude (i.e., rectified amplitude = integrated amplitude/period) in uV
-% 'UpSlope': positive half-wave upward slope in uV/sec
-% 'DownSlope': positive half-wave downward slope in uV/sec
-%
-% June 24, 2020 Version 1.0
-% Aug  27, 2020 Revised 1.1 Critical bug fixes: ch order, polarity, channel
-%   labels
-% Sept 13, 2020 Revised 1.2 included sleep stages in output and SW events,
-%   fixed bug for SW inclusion criteria, optimised code
-% Sept 16, 2020 Revised 1.3 negative slope calculation bug fixed. Improved
-%   detection criteria to include any adjacent HWs
-% Sept 23, 2020 Revised 1.4 major fix for starting issue with polarity and
-%   table creation for multiple files.
-% Sept 24, 2020 Revised 1.5 fixed conflict with identical latency events
-% Sept 28, 2020 Revised 1.6 adjusted filtering parameters and functions to
-%   improve filter response - AG
-% Jun 1, 2021 Revised 1.7 (incorporated updates from AG): 
-%   1. updates to HW threshold process. The peak-to-peak amplitude is now 
-%   calculated by finding the difference between the maximum absolute peak 
-%   of each HW and it's oppositely valanced HW neighbours. As before, the 
-%   length of each HW and it's neighbour is also checked to ensure it falls
-%   within the correct frequency range. Only HWs that meet both criteria 
-%   are included in future analyses. 
-%   2. added feature to save each subjects data as separate .csv files in 
-%   addition to concatinated .csv for all subjects 
-%   3. minor fix to correct mismatch between filename and setname in output 
-%   table - SF
-%   4. added half wave amplitude threshold in addition to p2p amplitude 
-%   threshold. - AG
-%   5. added functionality to remove unwanted SW during sleepstages of 
-%   non-interest - SF
-% Jun 21, 2021 Revised 1.8: added feature to remove SW events outside
-%   Lights OFF/ON tags.
-% May 26, 2022 Revised 1.9: corrected bug in calculation on integrated
-%   amplitude - SF
+% EEGlab GUI for Period Amplitude Analysis (PAA) on EEGlab data to
+% detect and measure slow waves. 
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
@@ -68,7 +12,7 @@ function [EEG,com] = pop_PAA(EEG)
 % Feinberg et al, 1978. https://doi.org/10.1016/0013-4694(78)90266-3
 % Geering et al, 1993. https://doi.org/10.1111/j.1365-2869.1993.tb00074.x
 % Bersagliere and Achermann, 2010. https://doi.org/10.1111/j.1365-2869.2009.00775.x
-% ...also, see recent papers by Tononi's group
+% ...also, see recent (2020's-ish) papers by Tononi's group
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

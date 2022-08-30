@@ -44,11 +44,12 @@ function vers = eegplugin_PAA(fig, trystrs, catchstrs)
 %   Lights OFF/ON tags.
 % May 26, 2022 Revised 1.9: corrected bug in calculation on integrated
 %   amplitude - SF
+% Aug 30, 2022 Revised 2.0: new SW parameters added to event structure. 
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
 
-vers = '1.9';
+vers = '2.0';
 if nargin < 3
     error('eegplugin_PAA requires 3 arguments');
 end
