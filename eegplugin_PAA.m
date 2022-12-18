@@ -45,11 +45,12 @@ function vers = eegplugin_PAA(fig, trystrs, catchstrs)
 % May 26, 2022 Revised 1.9: corrected bug in calculation on integrated
 %   amplitude - SF
 % Aug 30, 2022 Revised 2.0: new SW parameters added to event structure. 
+% Dec 18, 2022 Revised 2.01: better handling of GUI input with multiple channels. 
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
 
-vers = '2.0';
+vers = '2.01';
 if nargin < 3
     error('eegplugin_PAA requires 3 arguments');
 end

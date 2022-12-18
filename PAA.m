@@ -441,10 +441,10 @@ for nch=1:size(datafilt,1)
     disp('Finding sleep stage label for each SW event...')
     Event = EEG.event;
     evtIdx = find(ismember({Event.type},eventName));
-    allSleepStages = strsplit(allSleepStages,' ');  % needed to parse input from eeglab GUI
+    allSleepStagesTemp = strsplit(allSleepStages,' ');  % needed to parse input from eeglab GUI
     
     for iEvt = evtIdx % loop on event
-        lastScoring = find(ismember({Event(1:iEvt).type},allSleepStages),1,'last');
+        lastScoring = find(ismember({Event(1:iEvt).type},allSleepStagesTemp),1,'last');
         if ~isempty(lastScoring)
             Event(iEvt).SleepStage = Event(lastScoring).type;
         else
