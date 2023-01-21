@@ -16,7 +16,7 @@ function [EEG,com] = pop_PAA(EEG)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% handle history
+% handle history & input arguments
 com = '';
 if nargin < 1
     help pop_PAA;
@@ -36,9 +36,9 @@ uilist = { ...
     ... label settings
     {'style', 'text', 'string', 'PAA for slow wave (0.5-2Hz, >75uV) detection'} ...
     {'style', 'text', 'string', 'Label for all sleep stages'} ...
-    {'style', 'edit', 'string', 'N1 N2 N3 REM Wake' 'tag' 'allSleepStages'} ...
+    {'style', 'edit', 'string', 'W N1 N2 SWS REM Unscored' 'tag' 'allSleepStages'} ...
     {'style', 'text', 'string', 'Label for sleep stages to exclude SW'} ...
-    {'style', 'edit', 'string', 'N1 REM Wake' 'tag' 'badSleepstages'} ...
+    {'style', 'edit', 'string', 'W N1 REM Unscored' 'tag' 'badSleepstages'} ...
     {'style', 'text', 'string', 'Label for bad data'} ...
     {'style', 'edit', 'string', 'Movement' 'tag' 'badData'} ...
     {'style', 'text', 'string', 'Labels for lights ON/OFF tags (comma separated)'} ...
@@ -46,12 +46,11 @@ uilist = { ...
     ... channel options
     { 'style' 'text'       'string' '' } ...
     { 'style' 'text'       'string' 'Channel labels or indices' } ...
-    { 'style' 'edit'       'string' 'F3 Fz F4' 'tag' 'ChOI' }  ...
+    { 'style' 'edit'       'string' 'Fz Cz Pz' 'tag' 'ChOI' }  ...
     { 'style' 'pushbutton' 'string' '...' 'callback' cb_chan }
     };
 
 % channel labels
-% --------------
 if ~isempty(EEG(1).chanlocs)
     tmpchanlocs = EEG(1).chanlocs;
 else
@@ -67,18 +66,31 @@ result = inputgui('geometry', geometry, 'geomvert', geomvert, 'uilist', uilist, 
 
 % launch PAA
 if ~isempty(result)
+    % Set user-defined parameters
     allSleepStages = result{1};
     badSleepstages = result{2};    
     badData = result{3};
     lightsTags = result{4};
-    ChOI = result{5};
+    ChOI = result{5};    
     % launch pipeline
-    [EEG] = PAA(EEG,ChOI,badData,allSleepStages,badSleepstages,lightsTags);
+    if length(EEG)>1 % batch mode
+        for iSet = 1:length(EEG)
+            EEG(iSet).setname = [EEG(iSet).setname '_SWdet']; % update setname
+            [EEG(iSet)] = PAA(EEG(iSet),ChOI,badData,allSleepStages,badSleepstages,lightsTags);
+            fprintf(1,'%s\n',['Saving file ' EEG(iSet).setname '.set']);
+            EEG(iSet) = pop_saveset(EEG(iSet),'filepath',EEG(iSet).filepath,'filename',EEG(iSet).setname,'savemode','onefile');
+        end
+    else
+        EEG.setname = [EEG.setname '_SWdet']; % update setname
+        [EEG] = PAA(EEG,ChOI,badData,allSleepStages,badSleepstages,lightsTags);
+        EEG = eeg_checkset(EEG);
+    end
 else
     com = '';
     return
 end
 
-com = sprintf('EEG = PAA(%s,%s,%s,%s,%s,%s);',inputname(1),ChOI,badData,allSleepStages,badSleepstages,lightsTags);
+com = sprintf('EEG = PAA(''%s'',''%s'',''%s'',''%s'',''%s'',''%s'');',inputname(1),ChOI,badData,allSleepStages,badSleepstages,lightsTags);
+EEG = eegh(com, EEG); % update history
 
 end

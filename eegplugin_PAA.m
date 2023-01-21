@@ -1,6 +1,6 @@
 function vers = eegplugin_PAA(fig, trystrs, catchstrs)
 
-% eegplugin_detect_spindles() - EEGLAB plugin for period amplitude analysis
+% eegplugin_PAA() - EEGLAB plugin for period amplitude analysis
 %
 % Usage:
 %   >> eegplugin_PAA(fig, trystrs, catchstrs)
@@ -46,17 +46,18 @@ function vers = eegplugin_PAA(fig, trystrs, catchstrs)
 %   amplitude - SF
 % Aug 30, 2022 Revised 2.0: new SW parameters added to event structure. 
 % Dec 18, 2022 Revised 2.01: better handling of GUI input with multiple channels. 
+% Dec 28, 2022 Revised 2.02: modified menu layout
+% Jan 21, 2023 Revised 2.1: batch uses GUI
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
 
-vers = '2.01';
+vers = '2.1';
 if nargin < 3
     error('eegplugin_PAA requires 3 arguments');
 end
 
 % add plugin folder to path
-% -----------------------
 if exist('pop_PAA.m','file')
     p = which('eegplugin_PAA');
     p = p(1:findstr(p,'eegplugin_PAA.m')-1);
@@ -64,14 +65,10 @@ if exist('pop_PAA.m','file')
 end
 
 % find tools menu
-% ---------------------
 menu = findobj(fig, 'tag', 'tools');
 
 % menu callbacks
-% --------------
 PAA_cback = [ trystrs.no_check '[EEG,LASTCOM] = pop_PAA(EEG);' catchstrs.add_to_hist trystrs.no_check '[ALLEEG EEG CURRENTSET] = pop_newset(ALLEEG, EEG, CURRENTSET);eeglab redraw;' catchstrs.add_to_hist ];
 
-% create menus if necessary
-% -------------------------
-submenu = uimenu( menu, 'Label', 'Period Amplitude Analysis');
-uimenu( submenu, 'Label', 'Period Amplitude Analysis', 'CallBack', PAA_cback);
+% create menu
+uimenu(menu, 'Label', 'Period Amplitude Analysis', 'CallBack', PAA_cback);

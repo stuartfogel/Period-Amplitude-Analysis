@@ -37,34 +37,25 @@ function [EEG] = PAA(EEG,ChOI,badData,allSleepStages,badSleepstages,lightsTags)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% INPUT ARGUMENTS
-if nargin < 1; EEG = eeg_emptyset(); end
-if nargin < 2; ChOI = 'Fz Cz Pz'; end % Default: 'Fz Cz Pz'
-if nargin < 3; badData = 'Movement'; end % name for movement artifact. Default: 'Movement'.
-if nargin < 4; allSleepStages = 'N1 N2 N3 REM Wake'; end % name for sleep stages included in scoring. Default: 'N1 N2 N3 REM Wake'.
-if nargin < 5; badSleepstages = 'N1 REM Wake'; end % sleep stages excluded from SW detection, Default: 'N1 REM Wake'.
-if nargin < 6; lightsTags = 'Lights Off, Lights On'; end % tags for lights on and lights off. used to remove false detections outside lights off interval. Default (comma separated): 'Lights Off, Lights On'.
-
 %% OPTIONAL PARAMETERS
 eventName = {'SWpos','SWneg'}; % name of event. Default: {'SWpos','SWneg'}.
 peaks = []; % mark event latencies at the HW peaks: 1, or at the zero-crossings: [] (default); note: marking peaks results in misalignment from results in output table. Useful for event-related analyses.
 
-%% FILTER SETTING (default for slow wave detection 0.5-4Hz)
+%% FILTER SETTING (default for slow wave detection 0.5-2Hz)
 % DO NOT MODIFY THESE SETTINGS UNLESS YOU REALLY KNOW WHAT YOU ARE DOING!
 % bandpass filter signal (filters with zero or linear phase-shifts needed to avoid signal distortions)
-% e.g., frequency range of interest from 0.5 to 4 Hz
+% e.g., frequency range of interest from 0.5 to 2 Hz
 % band-pass filtered:
 % 32nd-order Chebyshev type II low-pass filter, -80 dB stopband attenuation (note: increased from 10 to 80 dB attenuation)
 % 64th-order Chebyshev type II high-pass filter; -80 dB stopband attenuation (note: increased from 10 to 80 dB attenuation)
 % The filters were applied in the forward and reverse directions, to achieve zero-phase distortion resulting in doubling of the filter order.
-% The cut-off frequencies were selected to achieve minimal attenuation in the band of interest (0.5-4 Hz) and good attenuation at neighbouring frequencies, i.e. below 0.5 and above 4 Hz
+% The cut-off frequencies were selected to achieve minimal attenuation in the band of interest (0.5-2 Hz) and good attenuation at neighbouring frequencies, i.e. below 0.5 and above 2 Hz
 % Adapted from doi: https://doi.org/10.1111/j.1365-2869.2009.00775.x
 LPorder  = 32;   % lowpass filter order
 LPfreq   = 2.15; % use 2.15 for target of 2 Hz, or 4.3 for target of 4Hz
 HPorder  = 64;   % highpass filter order
 HPfreq   = 0.46; % highpass filter cutoff
 filtAttn = 80;   % stopband attenuation (dB)
-
 targetLPfreq = 2; % target lowpass frequency: use 2 for target of 2 Hz, or use 4 for target of 4Hz
 % use fvtool(lp,hp) after building filters below to visualize
 
@@ -607,8 +598,9 @@ SW(height(SW)-length(stage)+1:end,4) = stage'; % this is a little tricky, but it
 clear Event evtIdx evtLatency evtStage stage
 
 %% SELECT OUTPUT DIRECTORY
-disp('Please select a directory in which to save the results.');
-resultDir = uigetdir('', 'Select the directory in which to save the results');
+% disp('Please select a directory in which to save the results.');
+% resultDir = uigetdir('', 'Select the directory in which to save the results');
+resultDir = EEG.filepath;
 
 %% save out "single subject" table
 subidx = cell2mat(cellfun(@(n) strcmpi(n, EEG.setname), SW.ID, 'UniformOutput', 0)); % logical index of current subj's data
