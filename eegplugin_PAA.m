@@ -48,11 +48,12 @@ function vers = eegplugin_PAA(fig, trystrs, catchstrs)
 % Dec 18, 2022 Revised 2.01: better handling of GUI input with multiple channels. 
 % Dec 28, 2022 Revised 2.02: modified menu layout
 % Jan 21, 2023 Revised 2.1: batch uses GUI
+% Feb 12, 2023 Revised 2.1.1: added progress bars
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
 
-vers = '2.1';
+vers = '2.1.1';
 if nargin < 3
     error('eegplugin_PAA requires 3 arguments');
 end

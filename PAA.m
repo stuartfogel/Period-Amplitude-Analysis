@@ -96,6 +96,8 @@ clear n nChOI chIdx
 %% filter the EEG channels of interest
 disp('Filtering the data...')
 
+progress = waitbar(0, 'Performing Complex Demodulation / RMS...'); pause(1)
+
 % build filters
 lp = design(fdesign.lowpass('N,Fst,Ast', LPorder, LPfreq, filtAttn, EEG.srate), 'cheby2');
 hp = design(fdesign.highpass('N,Fst,Ast', HPorder, HPfreq, filtAttn, EEG.srate), 'cheby2');
@@ -115,7 +117,8 @@ clear hp lp filtCh n data
 for nch=1:size(datafilt,1)
     
     disp(['Processing channel: ' num2str(nch) ' of ' num2str(size(datafilt,1)) ' ...'])
-    
+    waitbar(1/size(datafilt,1)*nch,progress,['Processing channel: ' num2str(nch) ' of ' num2str(size(datafilt,1)) ' ...']); pause(1)
+
     % find zero-crossings
     disp('Finding zero crossings...')
     xdiff = diff(sign(datafilt(nch,:)));
@@ -607,5 +610,8 @@ subidx = cell2mat(cellfun(@(n) strcmpi(n, EEG.setname), SW.ID, 'UniformOutput', 
 SWsub = SW(subidx,:);
 writetable(SWsub, [resultDir filesep EEG.setname '_SWevents.csv'], 'Delimiter', ',');
 clear SW SWsub subidx SWnew startDelay nch datafilt ToRmv Event
+
+waitbar(1,progress,'Slow wave detection complete...'); pause(1)
+close(progress)
 
 end
