@@ -96,7 +96,7 @@ clear n nChOI chIdx
 %% filter the EEG channels of interest
 disp('Filtering the data...')
 
-progress = waitbar(0, 'Performing Complex Demodulation / RMS...'); pause(1)
+progress = waitbar(0, 'Filtering the data...'); pause(1)
 
 % build filters
 lp = design(fdesign.lowpass('N,Fst,Ast', LPorder, LPfreq, filtAttn, EEG.srate), 'cheby2');
@@ -435,10 +435,9 @@ for nch=1:size(datafilt,1)
     disp('Finding sleep stage label for each SW event...')
     Event = EEG.event;
     evtIdx = find(ismember({Event.type},eventName));
-    allSleepStagesTemp = strsplit(allSleepStages,' ');  % needed to parse input from eeglab GUI
     
     for iEvt = evtIdx % loop on event
-        lastScoring = find(ismember({Event(1:iEvt).type},allSleepStagesTemp),1,'last');
+        lastScoring = find(ismember({Event(1:iEvt).type},allSleepStages),1,'last');
         if ~isempty(lastScoring)
             Event(iEvt).SleepStage = Event(lastScoring).type;
         else
@@ -517,17 +516,19 @@ ToRmvSS = [];
 ToRmvLightsOff = [];
 ToRmvLightsOn = [];
 tagFoundFlag = 0;
-badSleepstages = strsplit(badSleepstages,' ');  % needed to parse input from eeglab GUI
-lightsTags = strsplit(lightsTags,', ');  % needed to parse input from eeglab GUI
 
+% remove events during bad data
 for iEvt = evtIdx % loop on event
-    bad = find(ismember({Event(1:iEvt).type},badData),1,'last');
+    bad = find(ismember({Event(1:iEvt).type},badData));
     if ~isempty(bad)
-        if Event(bad).latency + Event(bad).duration > Event(iEvt).latency
-            ToRmvArt(end+1) = iEvt;
+        for nBad = 1:length(bad)
+            if Event(iEvt).latency < Event(bad(nBad)).latency + Event(bad(nBad)).duration
+                ToRmvArt(end+1) = iEvt;
+            end
         end
     end
 end
+% remove events during wrong sleep stages
 for iEvt = evtIdx % loop on event
     bad = find(ismember({Event(1:iEvt).type},badSleepstages),1,'last');
     if ~isempty(bad)
@@ -536,6 +537,7 @@ for iEvt = evtIdx % loop on event
         end
     end
 end
+% remove events outside lights on/off
 for iEvt = evtIdx % loop on event
     bad = find(ismember({Event(1:iEvt).type},lightsTags),1,'last');
     badEvt(end+1) = iEvt;
