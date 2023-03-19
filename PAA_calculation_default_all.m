@@ -21,7 +21,7 @@ function PAA_calculation_default_all()
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% User defined parameters
-PARAM.channels = {'Fz','Cz','Pz','Oz'}; % channels to extract slow wave info. Default = {'Fz','Cz','Pz','Oz'}.
+PARAM.channels = {'Fz','Cz','Pz'}; % channels to extract slow wave info. Default = {'Fz','Cz','Pz','Oz'}.
 PARAM.stages = {'N2','N3'}; % channels to extract slow wave info. Default = {'N2','N3'}.
 
 %% Specify filename(s)
