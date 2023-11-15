@@ -50,11 +50,13 @@ function vers = eegplugin_PAA(fig, trystrs, catchstrs)
 % Jan 21, 2023 Revised 2.1: batch uses GUI
 % Feb 12, 2023 Revised 2.1.1: added progress bars
 % Feb 15, 2023 Revised 2.1.2: handle multiple bad data markers
+% Nov 15, 2023 Revised 2.1.3: include error catch if channel labels include
+%   whitespaces
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
 
-vers = '2.1.2';
+vers = '2.1.3';
 if nargin < 3
     error('eegplugin_PAA requires 3 arguments');
 end

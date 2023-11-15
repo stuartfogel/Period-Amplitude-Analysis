@@ -22,7 +22,7 @@ function PAA_calculation_default_all()
 
 %% User defined parameters
 PARAM.channels = {'Fz','Cz','Pz'}; % channels to extract slow wave info. Default = {'Fz','Cz','Pz','Oz'}.
-PARAM.stages = {'N2','N3'}; % channels to extract slow wave info. Default = {'N2','N3'}.
+PARAM.stages = {'N2','SWS'}; % channels to extract slow wave info. Default = {'N2','SWS'}.
 
 %% Specify filename(s)
 % you can manually specify filenames here, or leave empty for pop-up
@@ -32,13 +32,12 @@ PARAM.resultDir = ''; % directory to save results output
 
 %% Open interface to select *.csv file(s)
 if isempty(PARAM.filename)
-    disp('Please select the file to process.');
+    disp('Please select the files to process.');
     [filename,pathname] = uigetfile(   {'*.csv', 'comma-separated file (*.CSV)'; ...
         '*.*', 'All Files (*.*)'}, ...
         'Choose files to process', ...
         'Multiselect', 'on');
 end
-
 % check the filename(s)
 if isequal(filename,0) % no files were selected
     disp('User selected Cancel')
@@ -48,7 +47,6 @@ else
         filename = cellstr(filename); % put the filename in the same cell structure as multiselect
     end
 end
-
 PARAM.filename = filename;
 PARAM.pathname = pathname;
 
@@ -57,11 +55,8 @@ if isempty(PARAM.resultDir)
     disp('Please select a directory in which to save the results.');
     resultDir = uigetdir('', 'Select the directory in which to save the results');
 end
-
 PARAM.resultDir = resultDir;
-
 clear filename pathname resultDir
-
 disp('Processing selected files...')
 
 %% Separate into slow waves from specified channel, stage & filename (defined above)
@@ -79,9 +74,7 @@ for nfile = 1:length(PARAM.filename)
         end
     end
 end
-
 clear tables perChannelidx perStageidx nfile nch nstage
-
 warning( 'off', 'MATLAB:xlswrite:AddSheet' );
 
 %% Export per channel per stage per N to excel
@@ -103,12 +96,11 @@ for nch = 1:length(PARAM.channels)
         end
     end
 end
-
 clear allTypeFilename sheetname
 
 %% Export summary data to excel
 
-% create empty cell structures
+% create empty cell structures - all types
 NumberAllType{length(PARAM.filename),length(PARAM.channels),length(PARAM.stages)} = [];
 DurationAllType{length(PARAM.filename),length(PARAM.channels),length(PARAM.stages)} = [];
 FrequencyAllType{length(PARAM.filename),length(PARAM.channels),length(PARAM.stages)} = [];
@@ -118,6 +110,7 @@ AverageAmplitudeAllType{length(PARAM.filename),length(PARAM.channels),length(PAR
 UpSlopeAllType{length(PARAM.filename),length(PARAM.channels),length(PARAM.stages)} = [];
 DownSlopeAllType{length(PARAM.filename),length(PARAM.channels),length(PARAM.stages)} = [];
 
+% create empty cell structures - positive waves
 NumberPos{length(PARAM.filename),length(PARAM.channels),length(PARAM.stages)} = [];
 DurationPos{length(PARAM.filename),length(PARAM.channels),length(PARAM.stages)} = [];
 FrequencyPos{length(PARAM.filename),length(PARAM.channels),length(PARAM.stages)} = [];
@@ -127,6 +120,7 @@ AverageAmplitudePos{length(PARAM.filename),length(PARAM.channels),length(PARAM.s
 UpSlopePos{length(PARAM.filename),length(PARAM.channels),length(PARAM.stages)} = [];
 DownSlopePos{length(PARAM.filename),length(PARAM.channels),length(PARAM.stages)} = [];
 
+% create empty cell structures - negative waves
 NumberNeg{length(PARAM.filename),length(PARAM.channels),length(PARAM.stages)} = [];
 DurationNeg{length(PARAM.filename),length(PARAM.channels),length(PARAM.stages)} = [];
 FrequencyNeg{length(PARAM.filename),length(PARAM.channels),length(PARAM.stages)} = [];

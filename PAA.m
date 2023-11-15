@@ -81,6 +81,13 @@ SW = table(N,ID,CH,SleepStage,HWlatency,HWperiod,HWfreq,HWpeak,HWintamp,HWrecamp
 
 %% find channels of interest
 ChName = {EEG.chanlocs.labels};
+% check that there are no whitespaces inthe channel labels
+for nCh = 1:length(ChName)
+    if any(isspace(ChName{nCh}))
+        error(['Channel ''' ChName{nCh} ''' contains a special character or whitespace. Please rename channels with only alphanumeric labels and without whitespaces.'])
+    end
+end
+% find the channels of interest
 nChOI = false(size(ChName));
 ChOI = strsplit(ChOI,' '); % needed to parse input from eeglab GUI
 for n = 1:length(ChOI)
