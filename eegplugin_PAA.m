@@ -56,7 +56,7 @@ function vers = eegplugin_PAA(fig, trystrs, catchstrs)
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
 
-vers = '2.1.3';
+vers = '2.1.4';
 if nargin < 3
     error('eegplugin_PAA requires 3 arguments');
 end

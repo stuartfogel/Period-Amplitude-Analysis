@@ -517,7 +517,6 @@ end
 disp('Deleting false positives...')
 Event = EEG.event;
 evtIdx = find(ismember({Event.type},eventName));
-badEvt = [];
 ToRmvArt = [];
 ToRmvSS = [];
 ToRmvLightsOff = [];
@@ -536,30 +535,32 @@ for iEvt = evtIdx % loop on event
     end
 end
 % remove events during wrong sleep stages
+badSSidx = find(ismember({Event(1:end).type},badSleepstages));
 for iEvt = evtIdx % loop on event
     bad = find(ismember({Event(1:iEvt).type},badSleepstages),1,'last');
     if ~isempty(bad)
         if Event(bad).latency + Event(bad).duration > Event(iEvt).latency
             ToRmvSS(end+1) = iEvt;
+        elseif Event(bad).latency + Event(bad).duration > length(EEG.data) % the event falls in the last sleep stage epoch of the recording
+            ToRmvSS(end+1) = iEvt;
+        elseif Event(badSSidx(end)).latency == Event(bad).latency && Event(iEvt).latency > Event(bad).latency % it's the last sleep stage epoch
+            ToRmvSS(end+1) = iEvt;
         end
     end
 end
 % remove events outside lights on/off
-for iEvt = evtIdx % loop on event
-    bad = find(ismember({Event(1:iEvt).type},lightsTags),1,'last');
-    badEvt(end+1) = iEvt;
-    if ~isempty(bad)
-        if strcmp(Event(bad).type, lightsTags{1}) && tagFoundFlag == 0 % lights off
-            ToRmvLightsOff = badEvt; % to remove from first SW event up until lights off tag
-            tagFoundFlag = 1;
-        elseif strcmp(Event(bad).type, lightsTags{2}) % lights on
-            if Event(iEvt).latency > Event(bad).latency
-                ToRmvLightsOn(end+1) = iEvt; % to remove SW events after lights on tag
-            end
+bad = find(ismember({Event(1:end).type},lightsTags));
+if ~isempty(bad)
+    for nBad = bad
+        if strcmp(Event(nBad).type, lightsTags{1}) && tagFoundFlag == 0 % lights off
+            ToRmvLightsOff = find(ismember({Event(1:bad).type},eventName)); % to remove from first SW event up until lights off tag
+        end
+        if strcmp(Event(nBad).type, lightsTags{2}) % lights on
+            ToRmvLightsOn = find(ismember({Event(nBad:end).type},eventName)); % to remove from lights on tag to EOF
         end
     end
 end
-clear tagFoundFlag bad badEvt Event evtIdx iEvt
+clear bad Event evtIdx iEvt
 ToRmv = [ToRmvArt ToRmvSS ToRmvLightsOff ToRmvLightsOn];
 ToRmv = sort(ToRmv);
 ToRmv = unique(ToRmv); % to remove the repeat offenders
