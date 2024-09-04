@@ -52,11 +52,14 @@ function vers = eegplugin_PAA(fig, trystrs, catchstrs)
 % Feb 15, 2023 Revised 2.1.2: handle multiple bad data markers
 % Nov 15, 2023 Revised 2.1.3: include error catch if channel labels include
 %   whitespaces
+% Sept 4, 2024 Revised 2.1.4: handled issues with orphaned events at end of
+% recording, outside sleep scoring.
+% Sept 4, 2024 Revised 2.1.5: added catch for when no events detected. 
 %
 % Copyright, Sleep Well. https://www.sleepwellpsg.com
 %
 
-vers = '2.1.4';
+vers = '2.1.5';
 if nargin < 3
     error('eegplugin_PAA requires 3 arguments');
 end

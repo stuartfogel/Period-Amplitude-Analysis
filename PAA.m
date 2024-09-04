@@ -523,6 +523,13 @@ ToRmvLightsOff = [];
 ToRmvLightsOn = [];
 tagFoundFlag = 0;
 
+% check to ensure there were events found
+if isempty(evtIdx)
+    close(progress)
+    warning('No SW events detected')
+    return % there were no events found on any channels
+end
+
 % remove events during bad data
 for iEvt = evtIdx % loop on event
     bad = find(ismember({Event(1:iEvt).type},badData));
@@ -591,6 +598,13 @@ EEG = eeg_checkset(EEG, 'eventconsistency');
 eeg_checkset(EEG);
 
 clear ToRmv ToRmvArt ToRmvSS ToRmvLightsOff ToRmvLightsOn
+
+% check to ensure there were events found
+if isempty(SW)
+    close(progress)
+    warning('No SW events detected')
+    return % there were no events found on any channels
+end
 
 %% find sleep stages for SW events and add to results table
 disp('Adding sleep stages to results table...')
