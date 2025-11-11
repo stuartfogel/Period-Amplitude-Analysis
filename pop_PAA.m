@@ -69,7 +69,7 @@ if ~isempty(result)
     % Set user-defined parameters
     allSleepStages = strtrim(strsplit(result{1},','));
     badSleepstages = strtrim(strsplit(result{2},','));
-    badData = strtrim(strsplit(result{3},','));
+    badData = strip(strsplit(result{3},','));
     lightsTags = strtrim(strsplit(result{4},','));
     ChOI = result{5};    
     % launch pipeline

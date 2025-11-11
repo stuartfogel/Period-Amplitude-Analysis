@@ -114,7 +114,11 @@ hp = design(fdesign.highpass('N,Fst,Ast', HPorder, HPfreq, filtAttn, EEG.srate),
 % filter the data
 datafilt = zeros(size(data)); % create array for filtered data
 for n=1:size(data,1)
-    filtCh = filtfilt(lp.sosMatrix,lp.ScaleValues, data(n,:)); % low-pass filter
+    filtCh = data(n,:);
+    if any(isnan(filtCh))
+        filtCh(isnan(filtCh)) = 0; % temporarily zero NaN data so filter can run without issue
+    end
+    filtCh = filtfilt(lp.sosMatrix,lp.ScaleValues, filtCh); % low-pass filter
     filtCh = filtfilt(hp.sosMatrix, hp.ScaleValues, filtCh); % high-pass filter
     datafilt(n,:) = filtCh(1,:); % add filtered data to array
 end
@@ -560,7 +564,7 @@ bad = find(ismember({Event(1:end).type},lightsTags));
 if ~isempty(bad)
     for nBad = bad
         if strcmp(Event(nBad).type, lightsTags{1}) && tagFoundFlag == 0 % lights off
-            ToRmvLightsOff = find(ismember({Event(1:bad).type},eventName)); % to remove from first SW event up until lights off tag
+            ToRmvLightsOff = find(ismember({Event(1:nBad).type},eventName)); % to remove from first SW event up until lights off tag
         end
         if strcmp(Event(nBad).type, lightsTags{2}) % lights on
             ToRmvLightsOn = find(ismember({Event(nBad:end).type},eventName)); % to remove from lights on tag to EOF
